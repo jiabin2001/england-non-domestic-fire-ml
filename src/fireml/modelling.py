@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import platform
 import subprocess
 import time
@@ -254,15 +255,15 @@ def run_core_models() -> dict[str, Any]:
     development = pd.DataFrame(development_rows)
     development.to_csv(ROOT / "outputs/tables/development_validation_performance.csv", index=False)
 
-    lock = {
-        "locked_at_utc": datetime.now(timezone.utc).isoformat(),
+    pre_test = {
+        "record_type": "internal_within_run_pre_test_configuration",
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "selection_metric": "validation PR-AUC",
         "threshold_rule": "maximum validation F1",
-        "temporal_test_consulted": False,
         "xgboost_device": device,
         "selected_hyperparameters": chosen,
         "selected_family_by_block": selected_by_block,
-        "thresholds": {
+        "locked_thresholds": {
             design: {
                 block: {
                     row["model"]: row["threshold"]
@@ -272,13 +273,25 @@ def run_core_models() -> dict[str, Any]:
             }
             for design in splits
         },
+        "seed": seed,
+        "split_years": {
+            "temporal_train": audit["temporal_train_years"],
+            "temporal_validation": audit["temporal_validation_years"],
+            "temporal_test": audit["temporal_test_years"],
+            "random_comparator": "target-stratified with temporal-matched partition sizes",
+        },
     }
-    lock_path = ROOT / "outputs/metrics/locked_model_config.json"
-    lock_path.write_text(json.dumps(lock, indent=2, default=_json_ready), encoding="utf-8")
+    pre_test_path = ROOT / "outputs/metrics/pre_test_model_config.json"
+    pre_test_path.write_text(
+        json.dumps(pre_test, indent=2, default=_json_ready), encoding="utf-8"
+    )
+    pre_test_hash = hashlib.sha256(pre_test_path.read_bytes()).hexdigest()
+    # Remove the legacy mutable receipt so it cannot be mistaken for an external record.
+    (ROOT / "outputs/metrics/locked_model_config.json").unlink(missing_ok=True)
 
-    # The holdout phase begins only after the lock receipt exists.
-    if not lock_path.exists():
-        raise RuntimeError("Temporal test evaluation attempted without a configuration lock.")
+    # Holdout evaluation begins only after the within-run pre-test record exists.
+    if not pre_test_path.exists():
+        raise RuntimeError("Holdout evaluation attempted without a pre-test configuration record.")
     test_rows = []
     for design, split in splits.items():
         development_indices = np.concatenate([split["train"], split["validation"]])
@@ -290,7 +303,7 @@ def run_core_models() -> dict[str, Any]:
                 pipeline.fit(frame.loc[development_indices, columns], frame.loc[development_indices, "LARGER_FIRE"])
                 seconds = time.perf_counter() - start
                 probability = pipeline.predict_proba(frame.loc[split["test"], columns])[:, 1]
-                threshold = float(lock["thresholds"][design][block][family])
+                threshold = float(pre_test["locked_thresholds"][design][block][family])
                 metrics = classification_metrics(frame.loc[split["test"], "LARGER_FIRE"].to_numpy(), probability, threshold)
                 row = {
                     "design": design, "split_role": "test", "block": block, "model": family,
@@ -333,10 +346,6 @@ def run_core_models() -> dict[str, Any]:
     stability["selected"] = np.isclose(stability["pr_auc"], stability["best_pr_auc"])
     stability.to_csv(ROOT / "outputs/tables/hyperparameter_stability_summary.csv", index=False)
 
-    lock["temporal_test_consulted"] = True
-    lock["test_evaluation_count_this_run"] = 1
-    lock["test_evaluated_at_utc"] = datetime.now(timezone.utc).isoformat()
-    lock_path.write_text(json.dumps(lock, indent=2, default=_json_ready), encoding="utf-8")
     runtime = {
         "python": platform.python_version(),
         "platform": platform.platform(),
@@ -348,4 +357,22 @@ def run_core_models() -> dict[str, Any]:
         "n_jobs": n_jobs,
     }
     (ROOT / "outputs/metrics/runtime_environment.json").write_text(json.dumps(runtime, indent=2), encoding="utf-8")
-    return {"lock": lock, "blocks": blocks, "splits": splits, "performance": performance}
+    post_test = {
+        "record_type": "internal_within_run_post_test_evaluation_receipt",
+        "test_evaluated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "test_evaluation_count_this_run": 1,
+        "pre_test_config_path": "outputs/metrics/pre_test_model_config.json",
+        "pre_test_config_sha256": pre_test_hash,
+        "runtime_environment_path": "outputs/metrics/runtime_environment.json",
+        "runtime_environment": runtime,
+    }
+    (ROOT / "outputs/metrics/post_test_evaluation_receipt.json").write_text(
+        json.dumps(post_test, indent=2, default=_json_ready), encoding="utf-8"
+    )
+    return {
+        "pre_test": pre_test,
+        "post_test": post_test,
+        "blocks": blocks,
+        "splits": splits,
+        "performance": performance,
+    }

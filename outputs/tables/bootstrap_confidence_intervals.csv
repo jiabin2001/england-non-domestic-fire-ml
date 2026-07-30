@@ -1,0 +1,4 @@
+estimand,design,block,model,point_estimate,ci_lower_95,ci_upper_95,bootstrap_repeats,bootstrap_seed,bootstrap_method
+PR-AUC,random,B,validation-selected XGBoost,0.6577880127085883,0.6462381308867304,0.6693253283585536,2000,20260811,stratified percentile bootstrap
+PR-AUC,temporal,B,validation-selected XGBoost,0.6419521680039855,0.6311053151184419,0.6529281644211142,2000,20260811,stratified percentile bootstrap
+random-minus-temporal PR-AUC difference,random-minus-temporal,B,validation-selected XGBoost,0.015835844704602864,-0.0005177295083549277,0.031384298574433714,2000,20260811,conditional independent stratified percentile bootstrap

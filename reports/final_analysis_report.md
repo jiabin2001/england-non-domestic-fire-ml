@@ -14,7 +14,7 @@ After year restriction, 20 exact duplicates, 3,063 late calls and 6,081 `Roofs/ 
 
 ## Validation and modelling
 
-Temporal train/validation/test years are 2010/11–2019/20, 2020/21–2021/22 and 2022/23–2023/24. The stratified random comparator has exactly the same 159,533/23,824/25,814 sample sizes. All imputing and encoding were pipeline-fitted on development data only. Compact hyperparameter selection used validation PR-AUC; analytical classification thresholds maximised validation F1. The temporal holdout was evaluated once after configuration locking.
+Temporal train/validation/test years are 2010/11–2019/20, 2020/21–2021/22 and 2022/23–2023/24. The stratified random comparator has exactly the same 159,533/23,824/25,814 sample sizes. All imputing and encoding were pipeline-fitted on development data only. Compact hyperparameter selection used validation PR-AUC; analytical classification thresholds maximised validation F1. Configurations and thresholds were programmatically recorded before the single within-run holdout-evaluation phase.
 
 The main model comparison is Block B, the retrospective incident-information model:
 
@@ -28,11 +28,34 @@ The main model comparison is Block B, the retrospective incident-information mod
 
 ### RQ1 — Random versus temporal validation
 
-For the validation-selected Block B XGBoost, random holdout PR-AUC was 0.658 and temporal holdout PR-AUC was 0.642, a random-minus-temporal difference of +0.016. Logistic Regression and Random Forest also had higher random than temporal Block B PR-AUC. Thus random splitting modestly overestimated later-year discrimination in the core retrospective scenario, although the magnitude depends on information block and should not be generalised to every deployment definition.
+For the validation-selected Block B XGBoost, random holdout PR-AUC was 0.658 (95% stratified bootstrap CI 0.646–0.669) and temporal holdout PR-AUC was 0.642 (0.631–0.653). The random-minus-temporal point difference was +0.016, with a 95% conditional independent bootstrap interval of -0.001 to +0.031. Random and temporal holdouts are different samples, so this is not a paired bootstrap. The interval included zero, so the +0.016 point difference was not clearly larger than test-sample resampling variation; evidence is insufficient to claim more than a possible modest overestimation in this fixed comparison.
+
+These intervals condition on the fixed splits, fitted models and selected hyperparameters. They represent test-sample uncertainty only and do not include variability from retraining or repeating model and hyperparameter selection.
+
+PR-AUC's no-information baseline is approximately the positive prevalence. The random and temporal XGBoost holdouts had prevalences of 0.257 and 0.265, respectively, so their PR-AUC values should not be compared mechanically without that context:
+
+| design | positive_prevalence | pr_auc | pr_auc_absolute_lift | normalized_pr_auc | roc_auc | brier_score |
+|---|---|---|---|---|---|---|
+| random | 0.257 | 0.658 | 0.401 | 0.539 | 0.856 | 0.128 |
+| temporal | 0.265 | 0.642 | 0.377 | 0.513 | 0.840 | 0.136 |
+
+Normalized PR-AUC is shown only as an auxiliary prevalence-relative summary, not as a uniquely accepted primary metric. The +0.016 raw PR-AUC difference is therefore interpreted jointly with prevalence, ROC-AUC, Brier score and the bootstrap interval. PR-AUC 0.642 is an area-under-curve measure, not “64.2% accuracy.”
 
 ### RQ2 — Best later-year model
 
 XGBoost had the highest temporal Block B PR-AUC (0.642), followed by Random Forest (0.635) and Logistic Regression (0.629). The margins are small relative to the much larger gain from adding information, so the result supports XGBoost within this prespecified comparison rather than a universal algorithm ranking.
+
+Grouped permutation of each original Block B field on the exact 2022/23–2023/24 temporal test set gave the following five largest mean PR-AUC decreases:
+
+| feature | mean_pr_auc_decrease | std_pr_auc_decrease | ci_lower_95 | ci_upper_95 |
+|---|---|---|---|---|
+| BUILDING_TYPE | 0.109 | 0.003 | 0.103 | 0.114 |
+| ITEM_IGNITED | 0.034 | 0.003 | 0.027 | 0.041 |
+| ALARM_SYSTEM | 0.031 | 0.003 | 0.025 | 0.036 |
+| FIRE_START_LOCATION | 0.026 | 0.002 | 0.023 | 0.029 |
+| IGNITION_TO_DISCOVERY | 0.022 | 0.002 | 0.018 | 0.025 |
+
+This analysis measures the fitted model's dependence on each recorded field, not a causal effect. High importance does not mean that a variable causes greater fire spread. Correlated or overlapping fields can share importance; in particular, `CAUSE_OF_FIRE`, `SOURCE_OF_IGNITION` and `ITEM_IGNITED` may encode overlapping information. Results apply only to this fitted pipeline, feature set and temporal test set, and negative values are retained rather than truncated.
 
 ### RQ3 — First-arrival information
 
@@ -57,9 +80,10 @@ The mandatory roof-positive definition increased temporal Block B PR-AUC to 0.65
 - Incident fields may reflect officer judgement; cause/ignition fields may be revised after investigation, and delay fields may be estimated.
 - Block B is retrospective and not strictly dispatch-time information.
 - Block C's exceptional performance is dominated by proximity to the final outcome and must remain a separate prognostic scenario.
-- Subgroup PR-AUC is prevalence-sensitive; subgroup comparisons are descriptive and not evidence of differential causal effects.
+- PR-AUC is prevalence-sensitive; cross-split and subgroup comparisons require their respective positive prevalences.
+- Subgroup and permutation results are descriptive model diagnostics, not evidence of differential or variable-level causal effects.
 - Temporal performance differences do not by themselves identify why distributions changed.
 
 ## Reproducibility
 
-All tables, figures, fitted selected pipelines, split assignments, lock receipt, software versions and exact method decisions are saved under `outputs/` and `reports/`. From an existing ODS or Parquet cache, run `python scripts/06_build_report.py` after installing the pinned project environment.
+All tables, figures, fitted selected pipelines, split assignments, within-run pre/post-test records, software versions and exact method decisions are saved under `outputs/` and `reports/`. From an existing ODS or Parquet cache, run `python scripts/06_build_report.py` after installing the pinned project environment.

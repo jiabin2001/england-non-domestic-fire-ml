@@ -25,7 +25,8 @@ The raw ODS is immutable. Its file size, download timestamp, SHA-256, page-updat
 - Block B: retrospective incident information. Investigation and estimated-delay limitations mean this is not strictly a dispatch-time model.
 - Block C: first-arrival prognostic information. It is reported separately and cannot support pre-incident or pre-arrival risk claims.
 - Validation: a temporally ordered primary design and a target-stratified random comparator with exactly matching train/validation/test sample sizes.
-- Primary metric: PR-AUC. The validation-F1 threshold is an analytical operating point, not a business-optimal FRS decision rule.
+- Primary metric: PR-AUC. Because its no-information baseline is approximately the positive prevalence, random–temporal comparisons are reported with prevalence context, ROC-AUC, Brier score and fixed-model bootstrap intervals. The validation-F1 threshold is an analytical operating point, not a business-optimal FRS decision rule.
+- Interpretation: original-field grouped permutation importance is reported only for the validation-selected Temporal Block B XGBoost pipeline. It measures model dependence on the fixed temporal test set, not causal effects.
 
 ## Environment
 
@@ -47,7 +48,7 @@ Do not modify the file. Once Parquet exists at `data/interim/other_building_fire
 
 ## Full reproducible run
 
-After activating the environment, the single command below rebuilds the audit, cohort, models, robustness analyses, figures and reports from the cached Parquet, or performs the one-time ODS import if Parquet is absent:
+After activating the environment, the single command below rebuilds the audit, cohort, models, test predictions, bootstrap intervals, grouped permutation importance, prevalence-context table, robustness analyses, ten figures and reports from the cached Parquet, or performs the one-time ODS import if Parquet is absent:
 
 ```powershell
 python scripts/06_build_report.py
@@ -77,11 +78,16 @@ python -m pytest -q
 - `reports/day1_feasibility.md`: blocking feasibility checks and locked time window.
 - `reports/hyperparameter_plan.md`: post-baseline, pre-test compact search plan.
 - `reports/final_analysis_report.md`: results organised around RQ1–RQ3.
-- `reports/methods_receipt.md`: exact source, cohort, target, features, split, parameters, thresholds, seeds, software and manifest.
+- `reports/methods_receipt.md`: exact source, cohort, target, features, split, parameters, thresholds, uncertainty/interpretability settings, seeds, software and manifest.
+- `outputs/tables/bootstrap_confidence_intervals.csv`: stratified fixed-model PR-AUC intervals and the conditional independent random-minus-temporal comparison.
+- `outputs/tables/grouped_permutation_importance.csv`: original-field Temporal Block B model-dependence estimates.
+- `outputs/tables/pr_auc_prevalence_context.csv`: PR-AUC baseline, absolute lift and auxiliary normalized PR-AUC alongside ROC-AUC and Brier score.
 - `outputs/tables/`: all requested audit, performance, stability, subgroup and sensitivity tables.
-- `outputs/figures/`: eight figures in both PNG and PDF.
+- `outputs/figures/`: ten figures in both PNG and PDF.
 - `outputs/models/`: validation-selected fitted pipelines.
-- `outputs/metrics/locked_model_config.json`: proof that configuration was locked before the temporal test phase.
+- `outputs/metrics/pre_test_model_config.json`: internal within-run configuration record written before holdout evaluation.
+- `outputs/metrics/post_test_evaluation_receipt.json`: post-test run receipt referencing the pre-test record hash and runtime environment.
+
+The two evaluation records are an auditable run-order safeguard. They are programmatically produced within a run and are not an externally timestamped preregistration.
 
 No external GIS, weather, demographic, socioeconomic or commercial-building data are used. No neural network, deep learning, SMOTE comparison, stacking, Bayesian optimisation or large-scale Optuna search is included.
-

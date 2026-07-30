@@ -39,13 +39,13 @@ def _fit_validation_then_test(
 def run_temporal_robustness() -> dict[str, pd.DataFrame]:
     cfg = load_yaml("config/analysis.yaml")
     audit = json.loads((ROOT / "outputs/metrics/audit_receipt.json").read_text(encoding="utf-8"))
-    lock = json.loads((ROOT / "outputs/metrics/locked_model_config.json").read_text(encoding="utf-8"))
+    pre_test = json.loads((ROOT / "outputs/metrics/pre_test_model_config.json").read_text(encoding="utf-8"))
     frame = pd.read_parquet(ROOT / cfg["cohort_path"])
     blocks = resolve_blocks(frame.columns)
     columns = blocks["B"]
-    family = lock["selected_family_by_block"]["temporal"]["B"]
-    parameters = lock["selected_hyperparameters"]["temporal"][family]
-    seed, n_jobs, device = int(cfg["random_seed"]), int(cfg["n_jobs"]), lock["xgboost_device"]
+    family = pre_test["selected_family_by_block"]["temporal"]["B"]
+    parameters = pre_test["selected_hyperparameters"]["temporal"][family]
+    seed, n_jobs, device = int(cfg["random_seed"]), int(cfg["n_jobs"]), pre_test["xgboost_device"]
     temporal = make_temporal_split(frame, audit["temporal_train_years"], audit["temporal_validation_years"], audit["temporal_test_years"])
 
     # Natural annual expanding windows, with locked hyperparameters and a fixed
@@ -97,7 +97,7 @@ def run_temporal_robustness() -> dict[str, pd.DataFrame]:
     model = make_model_pipeline(resolve_blocks(extended.columns)["B"], family, parameters, seed, n_jobs, device)
     model.fit(extended.loc[train_idx, columns], extended.loc[train_idx, "LARGER_FIRE"])
     probability = model.predict_proba(extended.loc[test_idx, columns])[:, 1]
-    locked_threshold = float(lock["thresholds"]["temporal"]["B"][family])
+    locked_threshold = float(pre_test["locked_thresholds"]["temporal"]["B"][family])
     metrics = classification_metrics(extended.loc[test_idx, "LARGER_FIRE"].to_numpy(), probability, locked_threshold)
     sensitivity_rows.append({
         "analysis": "include_2024_25_exclude_suffolk", "test_period": "2024/25",
@@ -114,7 +114,7 @@ def run_temporal_robustness() -> dict[str, pd.DataFrame]:
         random_split = make_random_split_like(frame, temporal, int(stability_seed))
         metrics, threshold = _fit_validation_then_test(
             frame, random_split, columns, family,
-            lock["selected_hyperparameters"]["random"][family], int(stability_seed), n_jobs, device,
+            pre_test["selected_hyperparameters"]["random"][family], int(stability_seed), n_jobs, device,
         )
         seed_rows.append({
             "seed": int(stability_seed), "design": "random", "block": "B", "model": family, **metrics,
@@ -132,4 +132,3 @@ def run_temporal_robustness() -> dict[str, pd.DataFrame]:
         "random_stability": random_stability,
         "subgroup": subgroup,
     }
-

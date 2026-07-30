@@ -40,15 +40,37 @@
 - Random comparator: stratified sampling with exactly matching train/validation/test counts.
 - Primary seed: 20260801; stability seeds: [20260801, 20260802, 20260803].
 - Selection metric: validation PR-AUC. Threshold: validation F1 maximum, an analytical operating point rather than an operational optimum.
-- Temporal test evaluation count in the locked run: 1.
+- Holdout evaluation count in this analysis run: 1.
+
+## Within-run evaluation records
+
+Model configurations and thresholds were programmatically recorded before holdout evaluation within each analysis run. This is an internal procedural safeguard, not an externally timestamped preregistration.
+
+- Pre-test record: `outputs/metrics/pre_test_model_config.json` (`internal_within_run_pre_test_configuration`), generated 2026-07-30T22:02:46.907838+00:00.
+- Post-test record: `outputs/metrics/post_test_evaluation_receipt.json` (`internal_within_run_post_test_evaluation_receipt`), generated 2026-07-30T22:08:10.997641+00:00.
+- The post-test record references pre-test SHA-256 `e2049979d4e1d782d1e5ed737e28c188376451868dba9abea68b13920ef916d6`. These files provide an auditable within-run order record; they do not independently verify researcher history outside the run.
 
 ## Hyperparameters and thresholds
 
 - Full candidate ranges and results: `reports/hyperparameter_plan.md` and `outputs/tables/hyperparameter_search_results.csv`.
 - Selected parameters: `{"temporal": {"logistic_regression": {"C": 0.1}, "random_forest": {"n_estimators": 200, "max_depth": null, "min_samples_leaf": 5, "max_features": "sqrt"}, "xgboost": {"n_estimators": 200, "learning_rate": 0.1, "max_depth": 6, "min_child_weight": 5, "subsample": 0.8, "colsample_bytree": 0.8}}, "random": {"logistic_regression": {"C": 1.0}, "random_forest": {"n_estimators": 200, "max_depth": null, "min_samples_leaf": 5, "max_features": "sqrt"}, "xgboost": {"n_estimators": 200, "learning_rate": 0.1, "max_depth": 6, "min_child_weight": 5, "subsample": 0.8, "colsample_bytree": 0.8}}}`
 - Validation-selected family by block: `{"temporal": {"A": "xgboost", "B": "xgboost", "C": "xgboost"}, "random": {"A": "xgboost", "B": "xgboost", "C": "xgboost"}}`
-- Locked thresholds: `{"temporal": {"A": {"dummy": 0.2499106767878746, "logistic_regression": 0.2867622375488281, "random_forest": 0.2722170425235016, "xgboost": 0.33036476373672485}, "B": {"dummy": 0.2499106767878746, "logistic_regression": 0.2742215096950531, "random_forest": 0.3519588449756025, "xgboost": 0.2836891710758209}, "C": {"dummy": 0.2499106767878746, "logistic_regression": 0.5661454796791077, "random_forest": 0.4307341088371494, "xgboost": 0.3571653366088867}}, "random": {"A": {"dummy": 0.25722577773877503, "logistic_regression": 0.272072970867157, "random_forest": 0.29698505349039045, "xgboost": 0.29469117522239685}, "B": {"dummy": 0.25722577773877503, "logistic_regression": 0.30903926491737366, "random_forest": 0.3399175365666454, "xgboost": 0.34557846188545227}, "C": {"dummy": 0.25722577773877503, "logistic_regression": 0.4314391613006592, "random_forest": 0.4773128881043004, "xgboost": 0.5401079654693604}}}`
+- Locked thresholds: `{"temporal": {"A": {"dummy": 0.2499106767878746, "logistic_regression": 0.2867622375488281, "random_forest": 0.2722170425235016, "xgboost": 0.33036476373672485}, "B": {"dummy": 0.2499106767878746, "logistic_regression": 0.2742215096950531, "random_forest": 0.3519588449756025, "xgboost": 0.2836891710758209}, "C": {"dummy": 0.2499106767878746, "logistic_regression": 0.5661454796791077, "random_forest": 0.43073410883714935, "xgboost": 0.3571653366088867}}, "random": {"A": {"dummy": 0.25722577773877503, "logistic_regression": 0.272072970867157, "random_forest": 0.29698505349039045, "xgboost": 0.29469117522239685}, "B": {"dummy": 0.25722577773877503, "logistic_regression": 0.30903926491737366, "random_forest": 0.3399175365666454, "xgboost": 0.34557846188545227}, "C": {"dummy": 0.25722577773877503, "logistic_regression": 0.4314391613006592, "random_forest": 0.4773128881043004, "xgboost": 0.5401079654693604}}}`
 - XGBoost device: `cuda`; tree method: `hist`.
+
+## Fixed-model uncertainty and prevalence context
+
+- PR-AUC intervals use 2,000 stratified bootstrap repeats with seed 20260811; positives and negatives are resampled separately with replacement so both class counts remain fixed.
+- The random-minus-temporal contrast independently resamples the two non-matched holdouts in each iteration and is a conditional independent bootstrap comparison, not a paired bootstrap.
+- Percentile limits are the 2.5th and 97.5th percentiles. They condition on fixed data splits, fitted models and selected hyperparameters; retraining and repeated model selection are outside their scope.
+- PR-AUC baseline, absolute lift and normalized PR-AUC are prevalence-context diagnostics. Normalized PR-AUC is auxiliary and does not replace the primary PR-AUC definition.
+
+## Grouped permutation importance
+
+- The validation-selected Temporal Block B XGBoost pipeline is evaluated on the exact saved 2022/23–2023/24 test indices.
+- Each of the 16 original Block B fields is permuted as a whole before the complete fitted preprocessing-and-model pipeline. This automatically groups all one-hot columns derived from that field.
+- Each field uses 30 repeats with seed 20260821; importance is baseline PR-AUC minus permuted PR-AUC, with negative values retained.
+- The reported percentile interval describes variation across permutations. Importance measures model dependence, not a causal effect, and may be shared across correlated or overlapping fields.
 
 ## Software
 
@@ -96,10 +118,15 @@
 - `outputs/figures/07_best_temporal_calibration.png`
 - `outputs/figures/08_building_type_subgroups.pdf`
 - `outputs/figures/08_building_type_subgroups.png`
+- `outputs/figures/09_bootstrap_pr_auc_ci.pdf`
+- `outputs/figures/09_bootstrap_pr_auc_ci.png`
+- `outputs/figures/10_grouped_permutation_importance.pdf`
+- `outputs/figures/10_grouped_permutation_importance.png`
 - `outputs/metrics/audit_receipt.json`
 - `outputs/metrics/cohort_receipt.json`
-- `outputs/metrics/locked_model_config.json`
 - `outputs/metrics/output_manifest.json`
+- `outputs/metrics/post_test_evaluation_receipt.json`
+- `outputs/metrics/pre_test_model_config.json`
 - `outputs/metrics/predictions_random_block_A.parquet`
 - `outputs/metrics/predictions_random_block_B.parquet`
 - `outputs/metrics/predictions_random_block_C.parquet`
@@ -119,6 +146,7 @@
 - `outputs/tables/best_temporal_calibration_curve.csv`
 - `outputs/tables/best_temporal_confusion_matrix.csv`
 - `outputs/tables/block_comparison.csv`
+- `outputs/tables/bootstrap_confidence_intervals.csv`
 - `outputs/tables/building_type_subgroup_performance.csv`
 - `outputs/tables/category_lifecycle.csv`
 - `outputs/tables/category_support_by_split.csv`
@@ -129,10 +157,12 @@
 - `outputs/tables/drift_summary.csv`
 - `outputs/tables/expanding_window_performance.csv`
 - `outputs/tables/feature_policy.csv`
+- `outputs/tables/grouped_permutation_importance.csv`
 - `outputs/tables/hyperparameter_search_results.csv`
 - `outputs/tables/hyperparameter_stability_summary.csv`
 - `outputs/tables/missingness_by_year.csv`
 - `outputs/tables/ods_sheet_inventory.csv`
+- `outputs/tables/pr_auc_prevalence_context.csv`
 - `outputs/tables/random_seed_stability.csv`
 - `outputs/tables/random_to_temporal_difference.csv`
 - `outputs/tables/random_validation_performance.csv`
