@@ -1,0 +1,200 @@
+column,category,first_year,last_year,n_years_present,appears_after_start,disappears_before_end
+BUILDING_TYPE,Bank / Building Society,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Casino / Club / Nightclub,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Church / Chapel / Cathedral,2010/11,2025/26,16,False,False
+BUILDING_TYPE,College / University,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Entertainment and Culture,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Factory,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Hospital,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Hostel,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Hotel / Motel,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Industrial Manufacturing (not including Factory),2010/11,2025/26,16,False,False
+BUILDING_TYPE,Industrial Processing (not including Recycling Centre),2010/11,2025/26,16,False,False
+BUILDING_TYPE,Medical care (not including Hospital),2010/11,2025/26,16,False,False
+BUILDING_TYPE,Mosque,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Nursing / Care Home,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Offices and call centres,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Other,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Other Education Establishment,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Other Religious,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Other Residential Home,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Permanent Agricultural,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Petrol station,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Pre School / Nursery / Infant / Primary School,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Prison,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Pub / Wine bar / Bar,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Public Utilities,2010/11,2025/26,16,False,False
+BUILDING_TYPE,"Public admin, security and safety",2010/11,2025/26,16,False,False
+BUILDING_TYPE,Recycling Centre,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Residential (not a dwelling),2010/11,2025/26,16,False,False
+BUILDING_TYPE,Restaurant / Cafe,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Retail,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Retirement Care Home,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Secondary School,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Shed / Garage / Greenhouse / Summer house,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Sheltered Housing - not self contained,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Shopping Centre,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Sporting venues,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Student Hall of Residence,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Synagogue,2010/11,2025/26,14,False,False
+BUILDING_TYPE,Takeaway / Fast food,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Temple,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Temporary office (eg portacabin),2010/11,2025/26,16,False,False
+BUILDING_TYPE,Transport buildings,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Vehicle Repair,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Warehouses and bulk storage,2010/11,2025/26,16,False,False
+BUILDING_TYPE,Young Offenders Unit,2010/11,2025/26,16,False,False
+FSO_APPLY,no,2010/11,2025/26,16,False,False
+FSO_APPLY,yes,2010/11,2025/26,16,False,False
+OCCUPIED_NORMAL,Not known,2010/11,2025/26,16,False,False
+OCCUPIED_NORMAL,Occupied,2010/11,2025/26,16,False,False
+OCCUPIED_NORMAL,Permanently vacant,2010/11,2025/26,16,False,False
+OCCUPIED_NORMAL,Under construction,2010/11,2025/26,16,False,False
+OCCUPIED_TIME,Not known,2010/11,2025/26,16,False,False
+OCCUPIED_TIME,no,2010/11,2025/26,16,False,False
+OCCUPIED_TIME,yes,2010/11,2025/26,16,False,False
+ALARM_SYSTEM,Alarm Absent,2010/11,2025/26,16,False,False
+ALARM_SYSTEM,Alarm Present and raised the alarm,2010/11,2025/26,16,False,False
+ALARM_SYSTEM,Alarm Present but did not operate,2010/11,2025/26,16,False,False
+ALARM_SYSTEM,Alarm Present but did not raise alarm,2010/11,2025/26,16,False,False
+SAFETY_SYSTEM,No Safety System,2010/11,2025/26,16,False,False
+SAFETY_SYSTEM,Other System operated but did not raise alarm,2010/11,2025/26,16,False,False
+SAFETY_SYSTEM,Other System present and raised the alarm,2010/11,2025/26,16,False,False
+SAFETY_SYSTEM,Other System present but did not operate,2010/11,2025/26,16,False,False
+SAFETY_SYSTEM,Sprinklers operated but did not raise alarm,2010/11,2025/26,16,False,False
+SAFETY_SYSTEM,Sprinklers present and raised the alarm,2010/11,2025/26,16,False,False
+SAFETY_SYSTEM,Sprinklers present but did not operate,2010/11,2025/26,16,False,False
+ACCIDENTAL_OR_DELIBERATE,Recorded as Accidental,2010/11,2025/26,16,False,False
+ACCIDENTAL_OR_DELIBERATE,Recorded as Deliberate,2010/11,2025/26,16,False,False
+CAUSE_OF_FIRE,Careless handling of fire or hot substances,2010/11,2025/26,16,False,False
+CAUSE_OF_FIRE,Chip/ fat pan fires,2010/11,2025/26,16,False,False
+CAUSE_OF_FIRE,Deliberate,2010/11,2025/26,16,False,False
+CAUSE_OF_FIRE,Faulty appliances and leads,2010/11,2025/26,16,False,False
+CAUSE_OF_FIRE,Faulty fuel supplies,2010/11,2025/26,16,False,False
+CAUSE_OF_FIRE,Misuse of equipment or appliances,2010/11,2025/26,16,False,False
+CAUSE_OF_FIRE,Other accidental,2010/11,2025/26,16,False,False
+CAUSE_OF_FIRE,Placing articles too close to heat,2010/11,2025/26,16,False,False
+CAUSE_OF_FIRE,Playing with fire,2010/11,2025/26,16,False,False
+CAUSE_OF_FIRE,Unspecified cause,2010/11,2025/26,16,False,False
+IGNITION_POWER,Electric,2010/11,2025/26,16,False,False
+IGNITION_POWER,Gas,2010/11,2025/26,16,False,False
+IGNITION_POWER,Other/ Not known/ Not Applicable,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,"Apparatus - batteries, generators",2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Audio equipment,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Barbecue,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Battery charger,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Blow lamp/Paint remover,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Bomb/Explosives,2010/11,2025/26,13,False,False
+SOURCE_OF_IGNITION,Camping stove,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Candles,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Central heating/Hot water,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Chimney Fires,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Cigarette lighters,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Cooker incl. oven,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Copiers/ Printers,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Deep fat fryer,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Dishwasher,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Domestic style gardening appliance,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Electric blanket,2011/12,2024/25,9,True,True
+SOURCE_OF_IGNITION,Electric kettle,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Extractor fan,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Fairy lights,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Fireworks ,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Flammable chemicals,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Fluorescent lights,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Food warming equipment (not cooking),2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Fridge/Freezer,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Gases,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Grill/Toaster,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Hair dryer,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Heater/Fire,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Heating equipment - Power Source,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Incendiary device,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Industrial dryer,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Industrial lift,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Intentional burning - out of control,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Iron,2010/11,2025/26,15,False,False
+SOURCE_OF_IGNITION,"Kiln, oven, furnace",2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Liquids; petrol/oil related,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Manufacturing equipment,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Matches,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Microwave oven,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,"Naked flame - Lighted paper, card or other naked flame",2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Natural occurrence,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Oil/Incense burners,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Other,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Other appliance or equipment,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Other computer equipment,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Other cooking appliance,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Other domestic style appliance,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Other electrical visual equipment,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Other heating equipment,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Other incandescent light bulbs,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Other industrial equipment,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Other lights,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,PC equipment (domestic use),2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Patio equipment,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Personal Computer,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Ring/hot plate (separate appliance),2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Separate water heating,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Smoking materials,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,"Solids; coal, coke, wood, card",2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Spin dryer,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Spot lights,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Spread from secondary fire,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,TV,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Telephone/Answering machine/Fax machine,2010/11,2025/26,14,False,False
+SOURCE_OF_IGNITION,Trouser press,2010/11,2016/17,4,False,True
+SOURCE_OF_IGNITION,Tumble dryer,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Unspecified,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Vacuum cleaner,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Vehicle - Electrical fault,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,"Vehicle - Engine, fuel line or pump",2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Vehicle - Exhausts,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Vehicle - Other non electrical,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Vehicle - Unknown,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Vehicle - Wheels or brakes,2010/11,2025/26,13,False,False
+SOURCE_OF_IGNITION,Vending equipment,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Video/DVD,2012/13,2025/26,9,True,False
+SOURCE_OF_IGNITION,Washer/Dryer combined,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Washing machine,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Welding/Cutting equipment,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,Wet hay,2010/11,2025/26,16,False,False
+SOURCE_OF_IGNITION,"Wiring, cabling, plugs",2010/11,2025/26,16,False,False
+FIRE_START_LOCATION,Barn,2010/11,2025/26,16,False,False
+FIRE_START_LOCATION,Bathroom/ Toilet,2010/11,2025/26,16,False,False
+FIRE_START_LOCATION,Bedroom/ Bedsitting Room,2010/11,2025/26,16,False,False
+FIRE_START_LOCATION,Boiler Room/ Power house/ Plant/ Generator,2010/11,2025/26,16,False,False
+FIRE_START_LOCATION,Corridor/ Hall/ Open Plan Area/ Reception Area,2010/11,2025/26,16,False,False
+FIRE_START_LOCATION,Dining Room/ Utility Room/ Conservatory,2010/11,2025/26,16,False,False
+FIRE_START_LOCATION,External fittings and structures,2010/11,2025/26,16,False,False
+FIRE_START_LOCATION,Garage,2010/11,2025/26,16,False,False
+FIRE_START_LOCATION,Kitchen,2010/11,2025/26,16,False,False
+FIRE_START_LOCATION,Meeting Room/ Office,2010/11,2025/26,16,False,False
+FIRE_START_LOCATION,Other,2010/11,2025/26,16,False,False
+FIRE_START_LOCATION,Process/ Production room,2010/11,2025/26,16,False,False
+FIRE_START_LOCATION,Refuse Store,2010/11,2025/26,16,False,False
+FIRE_START_LOCATION,Roof/ Roof Space,2010/11,2025/26,16,False,False
+FIRE_START_LOCATION,Shop floor/ Showroom/ Display hall,2010/11,2025/26,16,False,False
+FIRE_START_LOCATION,Stairs/ Under stairs (enclosed area),2010/11,2025/26,16,False,False
+FIRE_START_LOCATION,Store Room/ Laundry Room/ Cloakroom,2010/11,2025/26,16,False,False
+FIRE_SIZE_ON_ARRIVAL,Limited to 2 floors,2010/11,2025/26,16,False,False
+FIRE_SIZE_ON_ARRIVAL,Limited to floor of origin (not whole building),2010/11,2025/26,16,False,False
+FIRE_SIZE_ON_ARRIVAL,Limited to item 1st ignited,2010/11,2025/26,16,False,False
+FIRE_SIZE_ON_ARRIVAL,Limited to room of origin,2010/11,2025/26,16,False,False
+FIRE_SIZE_ON_ARRIVAL,No fire damage,2010/11,2025/26,16,False,False
+FIRE_SIZE_ON_ARRIVAL,Roofs/ Roof spaces,2010/11,2025/26,16,False,False
+FIRE_SIZE_ON_ARRIVAL,Whole Building/ Affecting more than 2 floors,2010/11,2025/26,16,False,False
+RESPONSE_TIME,1 to 2,2010/11,2025/26,16,False,False
+RESPONSE_TIME,10 to 15,2010/11,2025/26,16,False,False
+RESPONSE_TIME,15 to 20,2010/11,2025/26,16,False,False
+RESPONSE_TIME,2 to 3,2010/11,2025/26,16,False,False
+RESPONSE_TIME,20 to 60,2010/11,2025/26,16,False,False
+RESPONSE_TIME,3 to 4,2010/11,2025/26,16,False,False
+RESPONSE_TIME,4 to 5,2010/11,2025/26,16,False,False
+RESPONSE_TIME,5 to 6,2010/11,2025/26,16,False,False
+RESPONSE_TIME,6 to 7,2010/11,2025/26,16,False,False
+RESPONSE_TIME,7 to 8,2010/11,2025/26,16,False,False
+RESPONSE_TIME,8 to 9,2010/11,2025/26,16,False,False
+RESPONSE_TIME,9 to 10,2010/11,2025/26,16,False,False
+RESPONSE_TIME,Not known,2010/11,2025/26,16,False,False

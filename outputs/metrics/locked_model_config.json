@@ -1,0 +1,103 @@
+{
+  "locked_at_utc": "2026-07-30T19:51:30.227319+00:00",
+  "selection_metric": "validation PR-AUC",
+  "threshold_rule": "maximum validation F1",
+  "temporal_test_consulted": true,
+  "xgboost_device": "cuda",
+  "selected_hyperparameters": {
+    "temporal": {
+      "logistic_regression": {
+        "C": 0.1
+      },
+      "random_forest": {
+        "n_estimators": 200,
+        "max_depth": null,
+        "min_samples_leaf": 5,
+        "max_features": "sqrt"
+      },
+      "xgboost": {
+        "n_estimators": 200,
+        "learning_rate": 0.1,
+        "max_depth": 6,
+        "min_child_weight": 5,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8
+      }
+    },
+    "random": {
+      "logistic_regression": {
+        "C": 1.0
+      },
+      "random_forest": {
+        "n_estimators": 200,
+        "max_depth": null,
+        "min_samples_leaf": 5,
+        "max_features": "sqrt"
+      },
+      "xgboost": {
+        "n_estimators": 200,
+        "learning_rate": 0.1,
+        "max_depth": 6,
+        "min_child_weight": 5,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8
+      }
+    }
+  },
+  "selected_family_by_block": {
+    "temporal": {
+      "A": "xgboost",
+      "B": "xgboost",
+      "C": "xgboost"
+    },
+    "random": {
+      "A": "xgboost",
+      "B": "xgboost",
+      "C": "xgboost"
+    }
+  },
+  "thresholds": {
+    "temporal": {
+      "A": {
+        "dummy": 0.2499106767878746,
+        "logistic_regression": 0.2867622375488281,
+        "random_forest": 0.2722170425235016,
+        "xgboost": 0.33036476373672485
+      },
+      "B": {
+        "dummy": 0.2499106767878746,
+        "logistic_regression": 0.2742215096950531,
+        "random_forest": 0.3519588449756025,
+        "xgboost": 0.2836891710758209
+      },
+      "C": {
+        "dummy": 0.2499106767878746,
+        "logistic_regression": 0.5661454796791077,
+        "random_forest": 0.4307341088371494,
+        "xgboost": 0.3571653366088867
+      }
+    },
+    "random": {
+      "A": {
+        "dummy": 0.25722577773877503,
+        "logistic_regression": 0.272072970867157,
+        "random_forest": 0.29698505349039045,
+        "xgboost": 0.29469117522239685
+      },
+      "B": {
+        "dummy": 0.25722577773877503,
+        "logistic_regression": 0.30903926491737366,
+        "random_forest": 0.3399175365666454,
+        "xgboost": 0.34557846188545227
+      },
+      "C": {
+        "dummy": 0.25722577773877503,
+        "logistic_regression": 0.4314391613006592,
+        "random_forest": 0.4773128881043004,
+        "xgboost": 0.5401079654693604
+      }
+    }
+  },
+  "test_evaluation_count_this_run": 1,
+  "test_evaluated_at_utc": "2026-07-30T19:56:44.011595+00:00"
+}

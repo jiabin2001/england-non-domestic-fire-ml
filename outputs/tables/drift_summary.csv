@@ -1,0 +1,5 @@
+column,train_categories,test_categories,unseen_in_test_count,absent_from_test_count,jensen_shannon_divergence_base2
+BUILDING_TYPE,45,45,0,0,0.013707588382705835
+ALARM_SYSTEM,4,4,0,0,0.0022866678084691506
+SAFETY_SYSTEM,7,7,0,0,0.0017211931376249299
+FIRE_SIZE_ON_ARRIVAL,7,7,0,0,0.000896524670944245

@@ -1,0 +1,98 @@
+{
+  "feasible": true,
+  "main_years": [
+    "2010/11",
+    "2011/12",
+    "2012/13",
+    "2013/14",
+    "2014/15",
+    "2015/16",
+    "2016/17",
+    "2017/18",
+    "2018/19",
+    "2019/20",
+    "2020/21",
+    "2021/22",
+    "2022/23",
+    "2023/24"
+  ],
+  "temporal_train_years": [
+    "2010/11",
+    "2011/12",
+    "2012/13",
+    "2013/14",
+    "2014/15",
+    "2015/16",
+    "2016/17",
+    "2017/18",
+    "2018/19",
+    "2019/20"
+  ],
+  "temporal_validation_years": [
+    "2020/21",
+    "2021/22"
+  ],
+  "temporal_test_years": [
+    "2022/23",
+    "2023/24"
+  ],
+  "logical_rows": 245207,
+  "duplicate_rows": 23,
+  "feature_blocks": {
+    "A": [
+      "DAY_OF_WEEK",
+      "DAY_NIGHT",
+      "BUILDING_TYPE",
+      "FSO_APPLY",
+      "OCCUPIED_NORMAL"
+    ],
+    "B": [
+      "DAY_OF_WEEK",
+      "DAY_NIGHT",
+      "BUILDING_TYPE",
+      "FSO_APPLY",
+      "OCCUPIED_NORMAL",
+      "OCCUPIED_TIME",
+      "ALARM_SYSTEM",
+      "SAFETY_SYSTEM",
+      "IGNITION_TO_DISCOVERY",
+      "DISCOVERY_TO_CALL",
+      "ACCIDENTAL_OR_DELIBERATE",
+      "CAUSE_OF_FIRE",
+      "IGNITION_POWER",
+      "SOURCE_OF_IGNITION",
+      "FIRE_START_LOCATION",
+      "ITEM_IGNITED"
+    ],
+    "C": [
+      "DAY_OF_WEEK",
+      "DAY_NIGHT",
+      "BUILDING_TYPE",
+      "FSO_APPLY",
+      "OCCUPIED_NORMAL",
+      "OCCUPIED_TIME",
+      "ALARM_SYSTEM",
+      "SAFETY_SYSTEM",
+      "IGNITION_TO_DISCOVERY",
+      "DISCOVERY_TO_CALL",
+      "ACCIDENTAL_OR_DELIBERATE",
+      "CAUSE_OF_FIRE",
+      "IGNITION_POWER",
+      "SOURCE_OF_IGNITION",
+      "FIRE_START_LOCATION",
+      "ITEM_IGNITED",
+      "FIRE_SIZE_ON_ARRIVAL",
+      "OTHER_PROPERTY_AFFECTED_ON_ARRIVAL",
+      "RESPONSE_TIME"
+    ]
+  },
+  "target_mapping": {
+    "Limited to room of origin": 0,
+    "No fire damage": 0,
+    "Limited to item 1st ignited": 0,
+    "Whole Building/ Affecting more than 2 floors": 1,
+    "Roofs/ Roof spaces": null,
+    "Limited to floor of origin (not whole building)": 1,
+    "Limited to 2 floors": 1
+  }
+}

@@ -1,0 +1,57 @@
+blocks:
+  A:
+    name: "structural and context model"
+    candidates:
+      - DAY_OF_WEEK
+      - DAY_NIGHT
+      - BUILDING_TYPE
+      - FSO_APPLY
+      - OCCUPIED_NORMAL
+  B:
+    name: "retrospective incident-information model"
+    extends: A
+    candidates:
+      - OCCUPIED_TIME
+      - ALARM_SYSTEM
+      - SAFETY_SYSTEM
+      - IGNITION_TO_DISCOVERY
+      - DISCOVERY_TO_CALL
+      - ACCIDENTAL_OR_DELIBERATE
+      - CAUSE_OF_FIRE
+      - IGNITION_POWER
+      - SOURCE_OF_IGNITION
+      - FIRE_START_LOCATION
+      - ITEM_IGNITED
+  C:
+    name: "first-arrival prognostic model"
+    extends: B
+    candidates:
+      - FIRE_SIZE_ON_ARRIVAL
+      - OTHER_PROPERTY_AFFECTED_ON_ARRIVAL
+      - RESPONSE_TIME
+leakage_blacklist:
+  - SPREAD_OF_FIRE
+  - ITEM_CAUSING_SPREAD
+  - RAPID_FIRE_GROWTH
+  - FIRE_DAMAGE_EXTENT
+  - FIRE_DAMAGE_EXTENT_CODE
+  - TOTAL_DAMAGE_EXTENT
+  - TOTAL_DAMAGE_EXTENT_CODE
+  - OTHER_PROPERTY_AFFECTED_CLOSE
+  - TIME_AT_SCENE
+  - TIME_AT_SCENE_CODE
+  - "TIME_AT_SCENE _CODE"
+  - VEHICLES
+  - VEHICLES_CODE
+  - PERSONNEL
+  - PERSONNEL_CODE
+  - FATALITY_CASUALTY
+  - RESCUES
+  - EVACUATIONS
+  - EVACUATIONS_CODE
+always_excluded:
+  - FINANCIAL_YEAR
+  - FRS_TERRITORY
+  - LATE_CALL
+  - LARGER_FIRE
+

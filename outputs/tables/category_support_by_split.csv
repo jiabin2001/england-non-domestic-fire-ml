@@ -1,0 +1,190 @@
+partition,column,category,count,proportion
+train,BUILDING_TYPE,Shed / Garage / Greenhouse / Summer house,29896,0.1873969648912764
+train,BUILDING_TYPE,Retail,16081,0.10080046134655526
+train,BUILDING_TYPE,Prison,7753,0.048598095691800444
+train,BUILDING_TYPE,Other,6821,0.04275604420402049
+train,BUILDING_TYPE,Industrial Manufacturing (not including Factory),6245,0.039145505945478366
+train,BUILDING_TYPE,Pub / Wine bar / Bar,5947,0.03727755386032984
+train,BUILDING_TYPE,Offices and call centres,5820,0.036481480320686
+train,BUILDING_TYPE,Permanent Agricultural,5657,0.035459748139883285
+train,BUILDING_TYPE,Hospital,5321,0.03335360082240038
+train,BUILDING_TYPE,Restaurant / Cafe,5305,0.03325330809299643
+train,BUILDING_TYPE,Residential (not a dwelling),5299,0.03321569831946995
+train,BUILDING_TYPE,Factory,4602,0.02884669629481048
+train,BUILDING_TYPE,Nursing / Care Home,3976,0.02492274325688102
+train,BUILDING_TYPE,Takeaway / Fast food,3863,0.02421442585546564
+train,BUILDING_TYPE,Retirement Care Home,3460,0.021688302733603705
+train,BUILDING_TYPE,Entertainment and Culture,3304,0.020710448621915217
+train,BUILDING_TYPE,Warehouses and bulk storage,3221,0.020190180088132236
+train,BUILDING_TYPE,Hotel / Motel,3172,0.019883033604332644
+train,BUILDING_TYPE,Pre School / Nursery / Infant / Primary School,2904,0.01820313038681652
+train,BUILDING_TYPE,Sporting venues,2612,0.016372788075194475
+train,BUILDING_TYPE,Student Hall of Residence,2501,0.015677007264954586
+train,BUILDING_TYPE,Vehicle Repair,2319,0.01453617746798468
+train,BUILDING_TYPE,Public Utilities,2057,0.012893884023995035
+train,BUILDING_TYPE,Industrial Processing (not including Recycling Centre),1959,0.012279591056395856
+train,BUILDING_TYPE,Other Residential Home,1814,0.011370688196172579
+train,BUILDING_TYPE,Hostel,1809,0.011339346718233846
+train,BUILDING_TYPE,Secondary School,1741,0.010913102618267067
+train,BUILDING_TYPE,Medical care (not including Hospital),1697,0.010637297612406211
+train,BUILDING_TYPE,Sheltered Housing - not self contained,1534,0.009615565431603492
+train,BUILDING_TYPE,Recycling Centre,1429,0.008957394394890085
+train,BUILDING_TYPE,"Public admin, security and safety",1391,0.008719199162555709
+train,BUILDING_TYPE,College / University,1365,0.008556223477274295
+train,BUILDING_TYPE,Transport buildings,1322,0.008286686767001184
+train,BUILDING_TYPE,Shopping Centre,1064,0.006669466505362527
+train,BUILDING_TYPE,Church / Chapel / Cathedral,832,0.005215221929005284
+train,BUILDING_TYPE,Temporary office (eg portacabin),755,0.004732563168748785
+train,BUILDING_TYPE,Bank / Building Society,561,0.003516513824725919
+train,BUILDING_TYPE,Casino / Club / Nightclub,531,0.0033284649570935166
+train,BUILDING_TYPE,Other Education Establishment,501,0.0031404160894611148
+train,BUILDING_TYPE,Young Offenders Unit,473,0.002964903813004206
+train,BUILDING_TYPE,Petrol station,371,0.002325537663054039
+train,BUILDING_TYPE,Other Religious,126,0.0007898052440560887
+train,BUILDING_TYPE,Mosque,61,0.0003823660308525509
+train,BUILDING_TYPE,Synagogue,31,0.0001943171632201488
+train,BUILDING_TYPE,Temple,30,0.00018804886763240208
+train,ALARM_SYSTEM,Alarm Absent,75641,0.47414014655275083
+train,ALARM_SYSTEM,Alarm Present and raised the alarm,55713,0.3492255520801339
+train,ALARM_SYSTEM,Alarm Present but did not operate,19584,0.12275830079043207
+train,ALARM_SYSTEM,Alarm Present but did not raise alarm,8595,0.053876000576683195
+train,SAFETY_SYSTEM,No Safety System,153185,0.9602088596089837
+train,SAFETY_SYSTEM,Sprinklers present but did not operate,2080,0.01303805482251321
+train,SAFETY_SYSTEM,Other System present and raised the alarm,1710,0.010718785455046918
+train,SAFETY_SYSTEM,Other System present but did not operate,1018,0.006381124908326177
+train,SAFETY_SYSTEM,Sprinklers present and raised the alarm,961,0.006023832059824613
+train,SAFETY_SYSTEM,Other System operated but did not raise alarm,399,0.0025010499395109478
+train,SAFETY_SYSTEM,Sprinklers operated but did not raise alarm,180,0.0011282932057944124
+train,FIRE_SIZE_ON_ARRIVAL,Limited to item 1st ignited,48546,0.30430067760275303
+train,FIRE_SIZE_ON_ARRIVAL,No fire damage,39354,0.24668250456018503
+train,FIRE_SIZE_ON_ARRIVAL,Limited to room of origin,35198,0.2206314680975096
+train,FIRE_SIZE_ON_ARRIVAL,Whole Building/ Affecting more than 2 floors,22216,0.1392564547773815
+train,FIRE_SIZE_ON_ARRIVAL,Limited to floor of origin (not whole building),11910,0.07465540045006362
+train,FIRE_SIZE_ON_ARRIVAL,Limited to 2 floors,1779,0.011151297850601443
+train,FIRE_SIZE_ON_ARRIVAL,Roofs/ Roof spaces,530,0.0033221966615057698
+validation,BUILDING_TYPE,Shed / Garage / Greenhouse / Summer house,5480,0.2300201477501679
+validation,BUILDING_TYPE,Retail,2057,0.08634150436534586
+validation,BUILDING_TYPE,Prison,1472,0.06178643384822028
+validation,BUILDING_TYPE,Other,1074,0.04508059100067159
+validation,BUILDING_TYPE,Permanent Agricultural,1033,0.04335963734049698
+validation,BUILDING_TYPE,Industrial Manufacturing (not including Factory),948,0.039791806581598387
+validation,BUILDING_TYPE,Residential (not a dwelling),857,0.035972128945601076
+validation,BUILDING_TYPE,Restaurant / Cafe,785,0.032949966420416386
+validation,BUILDING_TYPE,Hospital,741,0.031103089321692413
+validation,BUILDING_TYPE,Pub / Wine bar / Bar,724,0.030389523169912693
+validation,BUILDING_TYPE,Takeaway / Fast food,685,0.02875251846877099
+validation,BUILDING_TYPE,Offices and call centres,578,0.02426124916051041
+validation,BUILDING_TYPE,Nursing / Care Home,564,0.023673606447280053
+validation,BUILDING_TYPE,Factory,562,0.023589657488247144
+validation,BUILDING_TYPE,Warehouses and bulk storage,558,0.02342175957018133
+validation,BUILDING_TYPE,Retirement Care Home,420,0.017629281396910678
+validation,BUILDING_TYPE,Hotel / Motel,403,0.016915715245130962
+validation,BUILDING_TYPE,Pre School / Nursery / Infant / Primary School,370,0.015530557421087979
+validation,BUILDING_TYPE,Vehicle Repair,369,0.015488582941571525
+validation,BUILDING_TYPE,Public Utilities,345,0.014481195433176629
+validation,BUILDING_TYPE,Entertainment and Culture,337,0.014145399597044996
+validation,BUILDING_TYPE,Sporting venues,318,0.013347884486232371
+validation,BUILDING_TYPE,Student Hall of Residence,314,0.013179986568166555
+validation,BUILDING_TYPE,Recycling Centre,303,0.01271826729348556
+validation,BUILDING_TYPE,Industrial Processing (not including Recycling Centre),294,0.012340496977837475
+validation,BUILDING_TYPE,Other Residential Home,260,0.01091336467427804
+validation,BUILDING_TYPE,Medical care (not including Hospital),257,0.010787441235728676
+validation,BUILDING_TYPE,Hostel,250,0.010493619879113498
+validation,BUILDING_TYPE,Transport buildings,202,0.008478844862323707
+validation,BUILDING_TYPE,Sheltered Housing - not self contained,202,0.008478844862323707
+validation,BUILDING_TYPE,Secondary School,185,0.0077652787105439896
+validation,BUILDING_TYPE,"Public admin, security and safety",161,0.006757891202149094
+validation,BUILDING_TYPE,College / University,135,0.00566655473472129
+validation,BUILDING_TYPE,Church / Chapel / Cathedral,120,0.005036937541974479
+validation,BUILDING_TYPE,Shopping Centre,112,0.0047011417058428475
+validation,BUILDING_TYPE,Temporary office (eg portacabin),84,0.003525856279382136
+validation,BUILDING_TYPE,Other Education Establishment,53,0.0022246474143720616
+validation,BUILDING_TYPE,Petrol station,48,0.0020147750167897917
+validation,BUILDING_TYPE,Bank / Building Society,47,0.0019728005372733376
+validation,BUILDING_TYPE,Casino / Club / Nightclub,45,0.00188885157824043
+validation,BUILDING_TYPE,Young Offenders Unit,29,0.001217259905977166
+validation,BUILDING_TYPE,Other Religious,21,0.000881464069845534
+validation,BUILDING_TYPE,Mosque,9,0.00037777031564808594
+validation,BUILDING_TYPE,Synagogue,7,0.00029382135661517797
+validation,BUILDING_TYPE,Temple,6,0.00025184687709872396
+validation,ALARM_SYSTEM,Alarm Absent,12064,0.506380120886501
+validation,ALARM_SYSTEM,Alarm Present and raised the alarm,8158,0.3424278038952317
+validation,ALARM_SYSTEM,Alarm Present but did not operate,2424,0.10174613834788448
+validation,ALARM_SYSTEM,Alarm Present but did not raise alarm,1178,0.04944593687038281
+validation,SAFETY_SYSTEM,No Safety System,22760,0.955339153794493
+validation,SAFETY_SYSTEM,Other System present and raised the alarm,353,0.014816991269308261
+validation,SAFETY_SYSTEM,Sprinklers present but did not operate,253,0.010619543317662862
+validation,SAFETY_SYSTEM,Sprinklers present and raised the alarm,176,0.007387508394895903
+validation,SAFETY_SYSTEM,Other System present but did not operate,170,0.007135661517797179
+validation,SAFETY_SYSTEM,Other System operated but did not raise alarm,83,0.003483881799865682
+validation,SAFETY_SYSTEM,Sprinklers operated but did not raise alarm,29,0.001217259905977166
+validation,FIRE_SIZE_ON_ARRIVAL,Limited to item 1st ignited,7042,0.29558428475486903
+validation,FIRE_SIZE_ON_ARRIVAL,No fire damage,5270,0.22120550705171255
+validation,FIRE_SIZE_ON_ARRIVAL,Limited to room of origin,4997,0.2097464741437206
+validation,FIRE_SIZE_ON_ARRIVAL,Whole Building/ Affecting more than 2 floors,4002,0.16798186702484888
+validation,FIRE_SIZE_ON_ARRIVAL,Limited to floor of origin (not whole building),2174,0.09125251846877099
+validation,FIRE_SIZE_ON_ARRIVAL,Limited to 2 floors,246,0.010325721961047684
+validation,FIRE_SIZE_ON_ARRIVAL,Roofs/ Roof spaces,93,0.0039036265950302216
+test,BUILDING_TYPE,Shed / Garage / Greenhouse / Summer house,4831,0.18714650964592858
+test,BUILDING_TYPE,Prison,2852,0.11048268381498412
+test,BUILDING_TYPE,Retail,2206,0.08545750368017355
+test,BUILDING_TYPE,Other,1290,0.049972882931742464
+test,BUILDING_TYPE,Restaurant / Cafe,955,0.03699542883706516
+test,BUILDING_TYPE,Industrial Manufacturing (not including Factory),942,0.0364918261408538
+test,BUILDING_TYPE,Permanent Agricultural,929,0.03598822344464244
+test,BUILDING_TYPE,Pub / Wine bar / Bar,910,0.035252188734795076
+test,BUILDING_TYPE,Residential (not a dwelling),781,0.030254900441620824
+test,BUILDING_TYPE,Hospital,755,0.029247695049198108
+test,BUILDING_TYPE,Takeaway / Fast food,697,0.027000852250716665
+test,BUILDING_TYPE,Offices and call centres,624,0.02417292941814519
+test,BUILDING_TYPE,Hotel / Motel,580,0.02246842798481444
+test,BUILDING_TYPE,Nursing / Care Home,554,0.021461222592391725
+test,BUILDING_TYPE,Warehouses and bulk storage,548,0.021228790578755714
+test,BUILDING_TYPE,Factory,516,0.019989153172696988
+test,BUILDING_TYPE,Entertainment and Culture,453,0.017548617029518866
+test,BUILDING_TYPE,Pre School / Nursery / Infant / Primary School,432,0.016735104981792825
+test,BUILDING_TYPE,Public Utilities,398,0.015417990237855428
+test,BUILDING_TYPE,Sporting venues,398,0.015417990237855428
+test,BUILDING_TYPE,Retirement Care Home,398,0.015417990237855428
+test,BUILDING_TYPE,Recycling Centre,334,0.01293871542573797
+test,BUILDING_TYPE,Student Hall of Residence,331,0.012822499418919966
+test,BUILDING_TYPE,Vehicle Repair,329,0.012745022081041295
+test,BUILDING_TYPE,Transport buildings,262,0.010149531262105833
+test,BUILDING_TYPE,Medical care (not including Hospital),254,0.009839621910591153
+test,BUILDING_TYPE,Other Residential Home,253,0.009800883241651816
+test,BUILDING_TYPE,Secondary School,249,0.009645928565894475
+test,BUILDING_TYPE,Hostel,249,0.009645928565894475
+test,BUILDING_TYPE,Industrial Processing (not including Recycling Centre),244,0.0094522352211978
+test,BUILDING_TYPE,"Public admin, security and safety",216,0.008367552490896412
+test,BUILDING_TYPE,Sheltered Housing - not self contained,199,0.007708995118927714
+test,BUILDING_TYPE,College / University,172,0.006663051057565662
+test,BUILDING_TYPE,Church / Chapel / Cathedral,153,0.005927016347718293
+test,BUILDING_TYPE,Shopping Centre,103,0.0039900829007515305
+test,BUILDING_TYPE,Temporary office (eg portacabin),93,0.0036026962113581778
+test,BUILDING_TYPE,Other Education Establishment,65,0.0025180134810567907
+test,BUILDING_TYPE,Casino / Club / Nightclub,58,0.0022468427984814444
+test,BUILDING_TYPE,Petrol station,57,0.002208104129542109
+test,BUILDING_TYPE,Young Offenders Unit,57,0.002208104129542109
+test,BUILDING_TYPE,Bank / Building Society,49,0.001898194778027427
+test,BUILDING_TYPE,Other Religious,21,0.0008135120477260401
+test,BUILDING_TYPE,Mosque,9,0.0003486480204540172
+test,BUILDING_TYPE,Temple,6,0.00023243201363601146
+test,BUILDING_TYPE,Synagogue,2,7.74773378786705e-05
+test,ALARM_SYSTEM,Alarm Absent,11758,0.4554892693887038
+test,ALARM_SYSTEM,Alarm Present and raised the alarm,10213,0.39563802587743085
+test,ALARM_SYSTEM,Alarm Present but did not operate,2503,0.09696288835515611
+test,ALARM_SYSTEM,Alarm Present but did not raise alarm,1340,0.05190981637870923
+test,SAFETY_SYSTEM,No Safety System,24479,0.9482838769659875
+test,SAFETY_SYSTEM,Other System present and raised the alarm,513,0.01987293716587898
+test,SAFETY_SYSTEM,Sprinklers present but did not operate,263,0.01018826993104517
+test,SAFETY_SYSTEM,Sprinklers present and raised the alarm,197,0.007631517781049043
+test,SAFETY_SYSTEM,Other System present but did not operate,185,0.00716665375377702
+test,SAFETY_SYSTEM,Other System operated but did not raise alarm,149,0.0057720616719609515
+test,SAFETY_SYSTEM,Sprinklers operated but did not raise alarm,28,0.0010846827303013869
+test,FIRE_SIZE_ON_ARRIVAL,Limited to item 1st ignited,8068,0.31254358100255675
+test,FIRE_SIZE_ON_ARRIVAL,No fire damage,6108,0.23661578988145968
+test,FIRE_SIZE_ON_ARRIVAL,Limited to room of origin,5303,0.2054311613852948
+test,FIRE_SIZE_ON_ARRIVAL,Whole Building/ Affecting more than 2 floors,3622,0.14031145889827226
+test,FIRE_SIZE_ON_ARRIVAL,Limited to floor of origin (not whole building),2348,0.09095839466955916
+test,FIRE_SIZE_ON_ARRIVAL,Limited to 2 floors,276,0.010691872627256528
+test,FIRE_SIZE_ON_ARRIVAL,Roofs/ Roof spaces,89,0.003447741535600837

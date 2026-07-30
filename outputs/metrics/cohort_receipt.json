@@ -1,0 +1,30 @@
+{
+  "rows": 209171,
+  "positive_count": 53804,
+  "positive_prevalence": 0.2572249499213562,
+  "years": [
+    "2010/11",
+    "2011/12",
+    "2012/13",
+    "2013/14",
+    "2014/15",
+    "2015/16",
+    "2016/17",
+    "2017/18",
+    "2018/19",
+    "2019/20",
+    "2020/21",
+    "2021/22",
+    "2022/23",
+    "2023/24"
+  ],
+  "target_mapping": {
+    "Whole Building/ Affecting more than 2 floors": 1,
+    "Limited to room of origin": 0,
+    "No fire damage": 0,
+    "Roofs/ Roof spaces": null,
+    "Limited to floor of origin (not whole building)": 1,
+    "Limited to item 1st ignited": 0,
+    "Limited to 2 floors": 1
+  }
+}

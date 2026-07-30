@@ -1,0 +1,51 @@
+{
+  "official_dataset_name": "Other Building Fires Dataset",
+  "source_page_url": "https://www.gov.uk/government/statistics/fire-statistics-incident-level-datasets",
+  "guidance_url": "https://www.gov.uk/government/statistics/fire-statistics-incident-level-datasets/other-building-fires-dataset-guidance",
+  "download_url": "https://assets.publishing.service.gov.uk/media/6a5e7a52c7c34404041b4663/Other_building_fires_dataset.ods",
+  "download_recorded_at_utc": "2026-07-30T19:21:56.590944+00:00",
+  "official_page_updated": "2026-07-22",
+  "file_name": "Other_building_fires_dataset.ods",
+  "file_size_bytes": 45066461,
+  "sha256": "560e5c1a18731cf8189b28471f6813675d6f95f447d680ec5603d9bb97718595",
+  "all_sheets": [
+    {
+      "sheet_name": "Cover_sheet",
+      "rows": 14,
+      "columns": 1
+    },
+    {
+      "sheet_name": "Datasheet",
+      "rows": 490412,
+      "columns": 42
+    },
+    {
+      "sheet_name": "config",
+      "rows": 6,
+      "columns": 2
+    }
+  ],
+  "data_sheet": "Datasheet",
+  "data_shape": [
+    245207,
+    40
+  ],
+  "python": "3.12.13",
+  "import_artifact_resolution": {
+    "ods_import_shape": [
+      490412,
+      42
+    ],
+    "logical_incident_shape": [
+      245207,
+      40
+    ],
+    "non_record_rows_removed": 245205,
+    "unnamed_columns_removed": [
+      "UNNAMED: 40",
+      "UNNAMED: 41"
+    ],
+    "rule": "Retain rows with FINANCIAL_YEAR and drop unnamed trailing columns."
+  },
+  "download_timestamp_utc": "2026-07-30T19:13:49.508579+00:00"
+}

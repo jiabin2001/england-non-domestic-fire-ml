@@ -1,0 +1,6 @@
+step,stage,records_before,records_excluded,records_remaining,reason
+1,Official incident dataset,245207,0,245207,All disclosed primary other-building fire records.
+2,Restrict analysis years,245207,26872,218335,Retain 2010/11 to 2023/24 only.
+3,Remove exact duplicates,218335,20,218315,Prespecified complete-row deduplication.
+4,Exclude late calls,218315,3063,215252,Fire was known extinguished when the call was made; different prediction scenario.
+5,Apply binary target mapping,215252,6081,209171,Exclude roofs/roof spaces and other unmappable targets.

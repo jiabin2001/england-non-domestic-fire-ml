@@ -1,0 +1,351 @@
+from __future__ import annotations
+
+import json
+import platform
+import subprocess
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+import joblib
+import numpy as np
+import pandas as pd
+import sklearn
+import xgboost
+from sklearn.dummy import DummyClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
+from xgboost import XGBClassifier
+
+from .config import ROOT, ensure_output_dirs, load_yaml
+from .evaluation import choose_f1_threshold, classification_metrics
+from .features import assert_no_leakage, resolve_blocks
+from .preprocessing import make_preprocessor
+from .splits import assignment_frame, make_random_split_like, make_temporal_split
+
+
+FAMILIES = ("logistic_regression", "random_forest", "xgboost")
+
+
+def detect_xgb_device() -> str:
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        return "cuda" if result.returncode == 0 and result.stdout.strip() else "cpu"
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return "cpu"
+
+
+def candidate_grid(device: str) -> dict[str, list[dict[str, Any]]]:
+    return {
+        "logistic_regression": [
+            {"C": 0.1},
+            {"C": 1.0},
+            {"C": 10.0},
+        ],
+        "random_forest": [
+            {"n_estimators": 100, "max_depth": None, "min_samples_leaf": 1, "max_features": "sqrt"},
+            {"n_estimators": 300, "max_depth": None, "min_samples_leaf": 1, "max_features": "sqrt"},
+            {"n_estimators": 200, "max_depth": None, "min_samples_leaf": 5, "max_features": "sqrt"},
+            {"n_estimators": 200, "max_depth": 20, "min_samples_leaf": 1, "max_features": "sqrt"},
+        ],
+        "xgboost": [
+            {"n_estimators": 100, "learning_rate": 0.3, "max_depth": 6, "min_child_weight": 1, "subsample": 1.0, "colsample_bytree": 1.0},
+            {"n_estimators": 300, "learning_rate": 0.1, "max_depth": 6, "min_child_weight": 1, "subsample": 1.0, "colsample_bytree": 1.0},
+            {"n_estimators": 200, "learning_rate": 0.1, "max_depth": 3, "min_child_weight": 1, "subsample": 1.0, "colsample_bytree": 1.0},
+            {"n_estimators": 200, "learning_rate": 0.1, "max_depth": 6, "min_child_weight": 5, "subsample": 0.8, "colsample_bytree": 0.8},
+        ],
+    }
+
+
+def default_config(family: str, device: str) -> dict[str, Any]:
+    return candidate_grid(device)[family][1 if family == "logistic_regression" else 0]
+
+
+def make_estimator(family: str, parameters: dict[str, Any], seed: int, n_jobs: int, device: str):
+    if family == "dummy":
+        return DummyClassifier(strategy="prior", random_state=seed)
+    if family == "logistic_regression":
+        return LogisticRegression(
+            C=float(parameters["C"]), solver="lbfgs", max_iter=500,
+            random_state=seed,
+        )
+    if family == "random_forest":
+        return RandomForestClassifier(
+            **parameters, random_state=seed, n_jobs=n_jobs,
+        )
+    if family == "xgboost":
+        return XGBClassifier(
+            **parameters,
+            objective="binary:logistic",
+            eval_metric="logloss",
+            tree_method="hist",
+            device=device,
+            random_state=seed,
+            n_jobs=n_jobs,
+        )
+    raise KeyError(family)
+
+
+def make_model_pipeline(columns: list[str], family: str, parameters: dict[str, Any], seed: int, n_jobs: int, device: str) -> Pipeline:
+    assert_no_leakage({"active": columns})
+    return Pipeline([
+        ("preprocess", make_preprocessor(columns)),
+        ("model", make_estimator(family, parameters, seed, n_jobs, device)),
+    ])
+
+
+def _fit_validation(
+    frame: pd.DataFrame,
+    split: dict[str, np.ndarray],
+    columns: list[str],
+    family: str,
+    parameters: dict[str, Any],
+    seed: int,
+    n_jobs: int,
+    device: str,
+) -> tuple[Pipeline, np.ndarray, dict]:
+    pipeline = make_model_pipeline(columns, family, parameters, seed, n_jobs, device)
+    start = time.perf_counter()
+    pipeline.fit(frame.loc[split["train"], columns], frame.loc[split["train"], "LARGER_FIRE"])
+    seconds = time.perf_counter() - start
+    probability = pipeline.predict_proba(frame.loc[split["validation"], columns])[:, 1]
+    threshold = choose_f1_threshold(frame.loc[split["validation"], "LARGER_FIRE"].to_numpy(), probability)
+    metrics = classification_metrics(frame.loc[split["validation"], "LARGER_FIRE"].to_numpy(), probability, threshold)
+    metrics["fit_seconds"] = float(seconds)
+    return pipeline, probability, metrics
+
+
+def _json_ready(value: Any) -> Any:
+    if isinstance(value, (np.integer, np.floating)):
+        return value.item()
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    return value
+
+
+def write_hyperparameter_plan(baseline: pd.DataFrame, grid: dict[str, list[dict[str, Any]]], device: str) -> None:
+    baseline_view = baseline[["design", "model", "pr_auc", "fit_seconds"]]
+    baseline_lines = ["| design | model | validation PR-AUC | fit seconds |", "|---|---|---:|---:|"]
+    baseline_lines.extend(
+        f"| {row.design} | {row.model} | {row.pr_auc:.4f} | {row.fit_seconds:.2f} |"
+        for row in baseline_view.itertuples(index=False)
+    )
+    baseline_text = "\n".join(baseline_lines)
+    report = f"""# Hyperparameter plan
+
+## Status and selection boundary
+
+This plan was written after the Day 1 audit and baseline fits, and before any temporal-test evaluation. Candidate configurations are deliberately compact and are selected only by validation-set PR-AUC. Test performance cannot alter the ranges. The selected configuration is a practical comparison setting, not a claim of theoretical optimality.
+
+XGBoost runtime device: `{device}` (`hist` tree method). CUDA is used only when `nvidia-smi` confirms an available GPU; otherwise execution falls back to CPU.
+
+## Baseline observations
+
+{baseline_text}
+
+## Logistic Regression
+
+- `C` controls inverse L2 regularisation strength. scikit-learn's default is 1.0.
+- Candidates: 0.1, 1.0 and 10.0. They cover stronger, default and weaker regularisation on a log scale without changing the algorithm or feature information.
+- `penalty='l2'`, `solver='lbfgs'` and `max_iter=500` remain fixed. The larger iteration limit is convergence control, not model-complexity tuning.
+- This compact range is fair because it gives the linear model meaningful regularisation flexibility while avoiding a much larger search budget than the tree models.
+
+## Random Forest
+
+- `n_estimators` controls Monte Carlo stability; software default is 100. Candidates use 100–300 trees.
+- `max_depth` controls tree depth; default is unlimited (`None`). One capped value (20) tests a materially simpler forest.
+- `min_samples_leaf` controls terminal-node regularisation; default is 1. Values 1 and 5 compare default with smoother leaves.
+- `max_features` remains at the software classification default, `sqrt`, so feature subsampling is not separately optimised.
+- Four joint configurations test default, more trees, larger leaves and capped depth. More configurations could favour this family merely by search volume, so the budget is intentionally limited.
+
+## XGBoost
+
+- The scikit-learn wrapper exposes `None` for many constructor defaults; the default-equivalent explicit configuration used here is 100 trees, learning rate 0.3, depth 6, minimum child weight 1, and full row/column sampling.
+- `n_estimators` and `learning_rate` control boosting length and shrinkage. Configurations compare 100×0.3 with 200–300×0.1.
+- `max_depth` controls interaction complexity; depth 3 is compared with the default-equivalent depth 6.
+- `min_child_weight` regularises small child nodes; 1 and 5 are compared.
+- `subsample` and `colsample_bytree` are 1.0 by default; a single 0.8/0.8 configuration checks moderate stochastic regularisation.
+- Four joint configurations keep XGBoost's search budget equal to Random Forest's and avoid a large optimisation exercise.
+
+## Candidate configurations
+
+```json
+{json.dumps(grid, indent=2)}
+```
+
+## Stability rule
+
+All candidate validation PR-AUC values are retained. The final configuration's margin over adjacent candidates is reported in `hyperparameter_stability_summary.csv`. Expanding-window and sensitivity analyses reuse the locked configuration and do not reopen the search.
+"""
+    (ROOT / "reports/hyperparameter_plan.md").write_text(report, encoding="utf-8")
+
+
+def run_core_models() -> dict[str, Any]:
+    ensure_output_dirs()
+    cfg = load_yaml("config/analysis.yaml")
+    frame = pd.read_parquet(ROOT / cfg["cohort_path"])
+    audit = json.loads((ROOT / "outputs/metrics/audit_receipt.json").read_text(encoding="utf-8"))
+    blocks = resolve_blocks(frame.columns)
+    seed, n_jobs = int(cfg["random_seed"]), int(cfg["n_jobs"])
+    device = detect_xgb_device()
+    temporal = make_temporal_split(
+        frame, audit["temporal_train_years"], audit["temporal_validation_years"], audit["temporal_test_years"]
+    )
+    random = make_random_split_like(frame, temporal, seed)
+    splits = {"temporal": temporal, "random": random}
+    assignment_frame(frame, splits).to_csv(ROOT / "outputs/tables/split_assignments.csv", index=False)
+
+    # Baselines on the prespecified central Block B, using validation only.
+    baseline_rows = []
+    for design, split in splits.items():
+        for family in ("dummy",) + FAMILIES:
+            params = {} if family == "dummy" else default_config(family, device)
+            _, _, metrics = _fit_validation(frame, split, blocks["B"], family, params, seed, n_jobs, device)
+            baseline_rows.append({"design": design, "block": "B", "model": family, **metrics, "parameters": json.dumps(params)})
+    baseline = pd.DataFrame(baseline_rows)
+    baseline.to_csv(ROOT / "outputs/tables/baseline_validation_performance.csv", index=False)
+    grid = candidate_grid(device)
+    write_hyperparameter_plan(baseline, grid, device)
+
+    # Formal compact selection on Block B only; no test labels are consulted.
+    search_rows = []
+    for design, split in splits.items():
+        for family in FAMILIES:
+            for candidate_id, params in enumerate(grid[family], start=1):
+                _, _, metrics = _fit_validation(frame, split, blocks["B"], family, params, seed, n_jobs, device)
+                search_rows.append({
+                    "design": design, "block": "B", "model": family,
+                    "candidate_id": candidate_id, "parameters": json.dumps(params), **metrics,
+                })
+    search = pd.DataFrame(search_rows)
+    search.to_csv(ROOT / "outputs/tables/hyperparameter_search_results.csv", index=False)
+    chosen: dict[str, dict[str, dict[str, Any]]] = {}
+    for design in splits:
+        chosen[design] = {}
+        for family in FAMILIES:
+            subset = search[(search["design"] == design) & (search["model"] == family)]
+            best = subset.sort_values(["pr_auc", "candidate_id"], ascending=[False, True]).iloc[0]
+            chosen[design][family] = json.loads(best["parameters"])
+
+    # With family hyperparameters fixed, obtain block-specific validation metrics,
+    # analytical F1 thresholds and the validation-selected family for each block.
+    development_rows = []
+    selected_by_block: dict[str, dict[str, str]] = {}
+    for design, split in splits.items():
+        selected_by_block[design] = {}
+        for block, columns in blocks.items():
+            for family in ("dummy",) + FAMILIES:
+                params = {} if family == "dummy" else chosen[design][family]
+                _, _, metrics = _fit_validation(frame, split, columns, family, params, seed, n_jobs, device)
+                development_rows.append({
+                    "design": design, "block": block, "model": family,
+                    "parameters": json.dumps(params), **metrics,
+                })
+            candidates = [row for row in development_rows if row["design"] == design and row["block"] == block and row["model"] != "dummy"]
+            selected_by_block[design][block] = max(candidates, key=lambda row: row["pr_auc"])["model"]
+    development = pd.DataFrame(development_rows)
+    development.to_csv(ROOT / "outputs/tables/development_validation_performance.csv", index=False)
+
+    lock = {
+        "locked_at_utc": datetime.now(timezone.utc).isoformat(),
+        "selection_metric": "validation PR-AUC",
+        "threshold_rule": "maximum validation F1",
+        "temporal_test_consulted": False,
+        "xgboost_device": device,
+        "selected_hyperparameters": chosen,
+        "selected_family_by_block": selected_by_block,
+        "thresholds": {
+            design: {
+                block: {
+                    row["model"]: row["threshold"]
+                    for row in development_rows if row["design"] == design and row["block"] == block
+                }
+                for block in blocks
+            }
+            for design in splits
+        },
+    }
+    lock_path = ROOT / "outputs/metrics/locked_model_config.json"
+    lock_path.write_text(json.dumps(lock, indent=2, default=_json_ready), encoding="utf-8")
+
+    # The holdout phase begins only after the lock receipt exists.
+    if not lock_path.exists():
+        raise RuntimeError("Temporal test evaluation attempted without a configuration lock.")
+    test_rows = []
+    for design, split in splits.items():
+        development_indices = np.concatenate([split["train"], split["validation"]])
+        for block, columns in blocks.items():
+            for family in ("dummy",) + FAMILIES:
+                params = {} if family == "dummy" else chosen[design][family]
+                pipeline = make_model_pipeline(columns, family, params, seed, n_jobs, device)
+                start = time.perf_counter()
+                pipeline.fit(frame.loc[development_indices, columns], frame.loc[development_indices, "LARGER_FIRE"])
+                seconds = time.perf_counter() - start
+                probability = pipeline.predict_proba(frame.loc[split["test"], columns])[:, 1]
+                threshold = float(lock["thresholds"][design][block][family])
+                metrics = classification_metrics(frame.loc[split["test"], "LARGER_FIRE"].to_numpy(), probability, threshold)
+                row = {
+                    "design": design, "split_role": "test", "block": block, "model": family,
+                    "parameters": json.dumps(params), "fit_seconds": float(seconds), **metrics,
+                }
+                test_rows.append(row)
+                if family == selected_by_block[design][block]:
+                    model_path = ROOT / f"outputs/models/best_{design}_block_{block}_{family}.joblib"
+                    joblib.dump(pipeline, model_path, compress=3)
+                    prediction = frame.loc[split["test"], ["SOURCE_ROW_ID", "FINANCIAL_YEAR", "BUILDING_TYPE", "LARGER_FIRE"]].copy()
+                    prediction["probability"] = probability
+                    prediction["prediction"] = (probability >= threshold).astype("int8")
+                    prediction.to_parquet(ROOT / f"outputs/metrics/predictions_{design}_block_{block}.parquet", index=True)
+    performance = pd.DataFrame(test_rows)
+    random_perf = performance[performance["design"] == "random"].reset_index(drop=True)
+    temporal_perf = performance[performance["design"] == "temporal"].reset_index(drop=True)
+    random_perf.to_csv(ROOT / "outputs/tables/random_validation_performance.csv", index=False)
+    temporal_perf.to_csv(ROOT / "outputs/tables/temporal_validation_performance.csv", index=False)
+
+    keys = ["block", "model"]
+    metric_columns = ["pr_auc", "roc_auc", "recall", "precision", "f1", "balanced_accuracy", "brier_score"]
+    comparison = random_perf[keys + metric_columns].merge(
+        temporal_perf[keys + metric_columns], on=keys, suffixes=("_random", "_temporal")
+    )
+    for metric in metric_columns:
+        comparison[f"{metric}_random_minus_temporal"] = comparison[f"{metric}_random"] - comparison[f"{metric}_temporal"]
+    comparison.to_csv(ROOT / "outputs/tables/random_to_temporal_difference.csv", index=False)
+
+    block_rows = []
+    for design in splits:
+        for block in blocks:
+            family = selected_by_block[design][block]
+            selected = performance[(performance["design"] == design) & (performance["block"] == block) & (performance["model"] == family)].iloc[0]
+            block_rows.append(selected.to_dict())
+    pd.DataFrame(block_rows).to_csv(ROOT / "outputs/tables/block_comparison.csv", index=False)
+
+    stability = search.copy()
+    stability["best_pr_auc"] = stability.groupby(["design", "model"])["pr_auc"].transform("max")
+    stability["delta_from_best_pr_auc"] = stability["pr_auc"] - stability["best_pr_auc"]
+    stability["selected"] = np.isclose(stability["pr_auc"], stability["best_pr_auc"])
+    stability.to_csv(ROOT / "outputs/tables/hyperparameter_stability_summary.csv", index=False)
+
+    lock["temporal_test_consulted"] = True
+    lock["test_evaluation_count_this_run"] = 1
+    lock["test_evaluated_at_utc"] = datetime.now(timezone.utc).isoformat()
+    lock_path.write_text(json.dumps(lock, indent=2, default=_json_ready), encoding="utf-8")
+    runtime = {
+        "python": platform.python_version(),
+        "platform": platform.platform(),
+        "pandas": pd.__version__,
+        "numpy": np.__version__,
+        "scikit_learn": sklearn.__version__,
+        "xgboost": xgboost.__version__,
+        "xgboost_device": device,
+        "n_jobs": n_jobs,
+    }
+    (ROOT / "outputs/metrics/runtime_environment.json").write_text(json.dumps(runtime, indent=2), encoding="utf-8")
+    return {"lock": lock, "blocks": blocks, "splits": splits, "performance": performance}

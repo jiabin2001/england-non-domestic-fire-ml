@@ -1,0 +1,8 @@
+raw_category,count,proportion,main_mapping,main_action
+Limited to item 1st ignited,68596,0.2797473155334065,0.0,retain_negative
+No fire damage,57208,0.23330492196389174,0.0,retain_negative
+Limited to room of origin,51762,0.21109511555542868,0.0,retain_negative
+Whole Building/ Affecting more than 2 floors,36998,0.15088476266990747,1.0,retain_positive
+Limited to floor of origin (not whole building),20457,0.0834274714832774,1.0,retain_positive
+Roofs/ Roof spaces,6924,0.028237366796217075,,exclude
+Limited to 2 floors,3262,0.013303045997871186,1.0,retain_positive
