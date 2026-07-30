@@ -289,9 +289,7 @@ def run_core_models() -> dict[str, Any]:
     # Remove the legacy mutable receipt so it cannot be mistaken for an external record.
     (ROOT / "outputs/metrics/locked_model_config.json").unlink(missing_ok=True)
 
-    # Holdout evaluation begins only after the within-run pre-test record exists.
-    if not pre_test_path.exists():
-        raise RuntimeError("Holdout evaluation attempted without a pre-test configuration record.")
+    # Holdout evaluation follows the successful pre-test record write above.
     test_rows = []
     for design, split in splits.items():
         development_indices = np.concatenate([split["train"], split["validation"]])

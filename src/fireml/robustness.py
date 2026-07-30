@@ -13,6 +13,7 @@ from .evaluation import choose_f1_threshold, classification_metrics
 from .features import resolve_blocks
 from .modelling import make_model_pipeline
 from .splits import make_random_split_like, make_temporal_split
+from .uncertainty import add_pr_auc_prevalence_context
 
 
 def _fit_validation_then_test(
@@ -64,7 +65,7 @@ def run_temporal_robustness() -> dict[str, pd.DataFrame]:
             "train_start": earlier[0], "train_end": earlier[-1], "test_year": test_year,
             "model": family, "block": "B", "threshold_note": "fixed 0.5; PR-AUC is primary", **metrics,
         })
-    expanding = pd.DataFrame(expanding_rows)
+    expanding = add_pr_auc_prevalence_context(pd.DataFrame(expanding_rows))
     expanding.to_csv(ROOT / "outputs/tables/expanding_window_performance.csv", index=False)
 
     main_row = pd.read_csv(ROOT / "outputs/tables/temporal_validation_performance.csv")

@@ -21,6 +21,7 @@
   "outputs/figures/10_grouped_permutation_importance.png",
   "outputs/metrics/audit_receipt.json",
   "outputs/metrics/cohort_receipt.json",
+  "outputs/metrics/data_archive_manifest.json",
   "outputs/metrics/output_manifest.json",
   "outputs/metrics/post_test_evaluation_receipt.json",
   "outputs/metrics/pre_test_model_config.json",

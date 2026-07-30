@@ -10,13 +10,13 @@ XGBoost runtime device: `cuda` (`hist` tree method). CUDA is used only when `nvi
 
 | design | model | validation PR-AUC | fit seconds |
 |---|---|---:|---:|
-| temporal | dummy | 0.2974 | 0.94 |
+| temporal | dummy | 0.2974 | 0.97 |
 | temporal | logistic_regression | 0.6467 | 1.41 |
-| temporal | random_forest | 0.6267 | 69.76 |
-| temporal | xgboost | 0.6637 | 1.27 |
-| random | dummy | 0.2572 | 0.92 |
-| random | logistic_regression | 0.6312 | 1.26 |
-| random | random_forest | 0.6117 | 72.34 |
+| temporal | random_forest | 0.6267 | 71.97 |
+| temporal | xgboost | 0.6637 | 1.32 |
+| random | dummy | 0.2572 | 0.96 |
+| random | logistic_regression | 0.6312 | 1.32 |
+| random | random_forest | 0.6117 | 74.39 |
 | random | xgboost | 0.6473 | 1.25 |
 
 ## Logistic Regression

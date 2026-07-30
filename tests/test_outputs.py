@@ -23,7 +23,10 @@ def test_required_output_table_schemas():
         "target_mapping.csv": {"raw_category", "main_mapping", "main_action"},
         "feature_policy.csv": {"raw_field", "block_a", "block_b", "block_c", "leakage_risk"},
         "annual_incident_prevalence.csv": {"FINANCIAL_YEAR", "incident_count", "larger_fire_prevalence"},
-        "expanding_window_performance.csv": {"test_year", "pr_auc", "roc_auc"},
+        "expanding_window_performance.csv": {
+            "test_year", "positive_prevalence", "pr_auc", "pr_auc_baseline",
+            "pr_auc_absolute_lift", "normalized_pr_auc", "roc_auc",
+        },
         "sensitivity_analysis_results.csv": {"analysis", "test_period", "pr_auc"},
         "bootstrap_confidence_intervals.csv": {
             "estimand", "design", "point_estimate", "ci_lower_95", "ci_upper_95",
@@ -86,6 +89,7 @@ def test_new_outputs_are_nonempty_and_manifested():
         "outputs/figures/10_grouped_permutation_importance.pdf",
         "outputs/metrics/pre_test_model_config.json",
         "outputs/metrics/post_test_evaluation_receipt.json",
+        "outputs/metrics/data_archive_manifest.json",
     }
     manifest = set(json.loads(
         (ROOT / "outputs/metrics/output_manifest.json").read_text(encoding="utf-8")
@@ -144,6 +148,32 @@ def test_grouped_importance_uses_every_block_b_field_and_saved_baseline(cohort):
     assert np.array_equal(predictions.index.to_numpy(), assigned)
 
 
+def test_expanding_window_has_valid_prevalence_context():
+    expanding = pd.read_csv(ROOT / "outputs/tables/expanding_window_performance.csv")
+    assert np.allclose(expanding["pr_auc_baseline"], expanding["positive_prevalence"])
+    assert np.allclose(
+        expanding["pr_auc_absolute_lift"],
+        expanding["pr_auc"] - expanding["positive_prevalence"],
+    )
+    expected_normalized = expanding["pr_auc_absolute_lift"] / (
+        1.0 - expanding["positive_prevalence"]
+    )
+    assert np.allclose(expanding["normalized_pr_auc"], expected_normalized)
+    assert expanding["normalized_pr_auc"].between(0, 1).all()
+
+
+def test_data_archive_manifest_matches_local_recovery_files():
+    path = ROOT / "outputs/metrics/data_archive_manifest.json"
+    archive = json.loads(path.read_text(encoding="utf-8"))
+    assert archive["external_archive_required"] is True
+    assert len(archive["files"]) == 3
+    for item in archive["files"]:
+        local = ROOT / item["path"]
+        assert item["exists"] is True
+        assert item["size_bytes"] == local.stat().st_size
+        assert item["sha256"] == hashlib.sha256(local.read_bytes()).hexdigest()
+
+
 def test_documentation_does_not_overstate_internal_run_records():
     paths = [
         ROOT / "README.md",
@@ -156,6 +186,7 @@ def test_documentation_does_not_overstate_internal_run_records():
         "proof of preregistration",
         "externally preregistered",
         "external preregistration",
+        "mandatory roof-positive",
     )
     assert all(phrase not in text for phrase in forbidden)
     required = (
@@ -163,5 +194,8 @@ def test_documentation_does_not_overstate_internal_run_records():
         "not an externally timestamped preregistration",
         "not fully independent",
         "not confidence-interval limits",
+        "official fire0304-aligned roof-positive definition",
+        "fixed descriptive threshold of 0.5",
+        "checksums verify retained files but cannot recover",
     )
     assert all(phrase in text for phrase in required)

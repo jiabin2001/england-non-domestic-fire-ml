@@ -16,10 +16,12 @@ This is a retrospective incident-level prediction study using completed Fire and
 
 The raw ODS is immutable. Its file size, download timestamp, SHA-256, page-update date, sheet inventory and data-sheet choice are in `data/raw/source_metadata.json` and `reports/methods_receipt.md`.
 
+The publisher URL is mutable: a checksum can verify a retained file but cannot recover it after replacement. Before dissertation deposit, archive the exact ODS together with `data/interim/other_building_fires_raw.parquet` and `data/processed/analysis_cohort.parquet` in durable institution-controlled storage. `outputs/metrics/data_archive_manifest.json` records their sizes and SHA-256 values; the data files remain excluded from Git to avoid treating source-data preservation as source-code versioning.
+
 ## Main design
 
 - Main cohort: primary other-building fires, 2010/11–2023/24, exact duplicates removed, late calls excluded, and only unambiguously mapped target categories retained.
-- Binary target: `LARGER_FIRE`, derived strictly from observed `SPREAD_OF_FIRE` strings. `Roofs/ Roof spaces` is excluded in the main analysis and positive in the mandatory sensitivity analysis.
+- Binary target: `LARGER_FIRE`, derived strictly from observed `SPREAD_OF_FIRE` strings. The main estimand uses the unambiguous room→floor→whole-building ordering and excludes `Roofs/ Roof spaces`, which does not locate an incident unambiguously on that scale. FIRE0304 counts roofs/roof spaces as a larger fire, so an official-definition sensitivity maps it positive.
 - Models: prior Dummy baseline, Logistic Regression, Random Forest and XGBoost. The latter three are the only main machine-learning models.
 - Block A: structural and context information.
 - Block B: retrospective incident information. Investigation and estimated-delay limitations mean this is not strictly a dispatch-time model.
@@ -87,6 +89,7 @@ python -m pytest -q
 - `outputs/models/`: validation-selected fitted pipelines.
 - `outputs/metrics/pre_test_model_config.json`: internal within-run configuration record written before holdout evaluation.
 - `outputs/metrics/post_test_evaluation_receipt.json`: post-test run receipt referencing the pre-test record hash and runtime environment.
+- `outputs/metrics/data_archive_manifest.json`: checksums and sizes for the raw ODS and two reproducibility Parquet files that must be deposited separately.
 
 The two evaluation records are an auditable run-order safeguard. They are programmatically produced within a run and are not an externally timestamped preregistration.
 

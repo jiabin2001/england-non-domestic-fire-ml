@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import importlib.metadata
@@ -32,6 +33,49 @@ def _save(fig: plt.Figure, stem: str) -> None:
     for extension in ("png", "pdf"):
         fig.savefig(ROOT / f"outputs/figures/{stem}.{extension}", dpi=220, bbox_inches="tight")
     plt.close(fig)
+
+
+def _write_data_archive_manifest() -> dict:
+    """Record recovery-critical data checksums without placing data in Git."""
+    cfg = load_yaml("config/analysis.yaml")
+    paths = (
+        ("official source ODS", ROOT / cfg["raw_path"]),
+        ("one-time imported raw Parquet", ROOT / cfg["parquet_path"]),
+        ("main analysis cohort Parquet", ROOT / cfg["cohort_path"]),
+    )
+    files = []
+    for role, path in paths:
+        relative = str(path.relative_to(ROOT)).replace("\\", "/")
+        if path.exists():
+            digest = hashlib.sha256()
+            with path.open("rb") as handle:
+                for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            files.append({
+                "role": role,
+                "path": relative,
+                "exists": True,
+                "size_bytes": path.stat().st_size,
+                "sha256": digest.hexdigest(),
+            })
+        else:
+            files.append({
+                "role": role,
+                "path": relative,
+                "exists": False,
+                "size_bytes": None,
+                "sha256": None,
+            })
+    manifest = {
+        "purpose": "checksums for a separate durable dissertation data deposit",
+        "external_archive_required": True,
+        "git_policy": "raw and reproducibility Parquet data are intentionally excluded from Git",
+        "files": files,
+    }
+    (ROOT / "outputs/metrics/data_archive_manifest.json").write_text(
+        json.dumps(manifest, indent=2), encoding="utf-8"
+    )
+    return manifest
 
 
 def _workflow_figure() -> None:
@@ -81,11 +125,19 @@ def _random_temporal_figure() -> None:
 
 def _expanding_figure() -> None:
     data = pd.read_csv(ROOT / "outputs/tables/expanding_window_performance.csv")
-    fig, ax = plt.subplots(figsize=(8, 4.8))
-    ax.plot(data.test_year, data.pr_auc, marker="o", color="#4c78a8", label="PR-AUC")
-    ax.plot(data.test_year, data.roc_auc, marker="s", color="#54a24b", label="ROC-AUC")
-    ax.set_ylim(0.5, 0.9); ax.set_ylabel("Area under curve"); ax.set_xlabel("One-year temporal test")
-    ax.set_title("Expanding-window annual performance: locked Block B XGBoost"); ax.legend(frameon=False)
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.8))
+    axes[0].plot(data.test_year, data.pr_auc, marker="o", color="#4c78a8", label="PR-AUC")
+    axes[0].plot(data.test_year, data.pr_auc_baseline, marker="s", color="#a43c3c", label="Positive prevalence")
+    axes[0].set_ylim(0.2, 0.75); axes[0].set_ylabel("PR-AUC / prevalence")
+    axes[0].set_title("Raw PR-AUC and its prevalence baseline")
+    axes[1].plot(data.test_year, data.normalized_pr_auc, marker="o", color="#f58518", label="Normalized PR-AUC")
+    axes[1].plot(data.test_year, data.roc_auc, marker="s", color="#54a24b", label="ROC-AUC")
+    axes[1].set_ylim(0.45, 0.88); axes[1].set_ylabel("Prevalence-context / ROC area")
+    axes[1].set_title("Prevalence-context discrimination")
+    for ax in axes:
+        ax.set_xlabel("One-year temporal test")
+        ax.legend(frameon=False)
+    fig.suptitle("Expanding-window annual performance: fixed Block B XGBoost settings")
     _save(fig, "04_expanding_window_performance")
 
 
@@ -212,6 +264,12 @@ def _write_final_report() -> None:
     importance = pd.read_csv(ROOT / "outputs/tables/grouped_permutation_importance.csv")
     cohort = json.loads((ROOT / "outputs/metrics/cohort_receipt.json").read_text(encoding="utf-8"))
     pre_test = json.loads((ROOT / "outputs/metrics/pre_test_model_config.json").read_text(encoding="utf-8"))
+    shared_configuration_families = [
+        family for family in ("logistic_regression", "random_forest", "xgboost")
+        if pre_test["selected_hyperparameters"]["temporal"][family]
+        == pre_test["selected_hyperparameters"]["random"][family]
+    ]
+    shared_configuration_text = ", ".join(MODEL_LABELS[family] for family in shared_configuration_families)
     main_models = temporal[(temporal.block == "B") & (temporal.model != "dummy")].sort_values("pr_auc", ascending=False)
     core_family = pre_test["selected_family_by_block"]["temporal"]["B"]
     temporal_core = temporal[(temporal.block == "B") & (temporal.model == core_family)].iloc[0]
@@ -223,6 +281,11 @@ def _write_final_report() -> None:
     importance_top = importance.head(5).copy()
     selected_temporal = block[block.design == "temporal"].set_index("block")
     rq3_gain = selected_temporal.loc["C", "pr_auc"] - selected_temporal.loc["B", "pr_auc"]
+    expanding_spearman = expanding[["positive_prevalence", "pr_auc"]].corr(method="spearman").iloc[0, 1]
+    expanding_pr_auc_range = expanding.pr_auc.max() - expanding.pr_auc.min()
+    expanding_lift_range = expanding.pr_auc_absolute_lift.max() - expanding.pr_auc_absolute_lift.min()
+    expanding_normalized_range = expanding.normalized_pr_auc.max() - expanding.normalized_pr_auc.min()
+    expanding_roc_range = expanding.roc_auc.max() - expanding.roc_auc.min()
     if difference_ci.ci_lower_95 > 0:
         difference_interpretation = (
             "The approximate-independent bootstrap interval remained above zero. "
@@ -255,9 +318,13 @@ The official ODS was updated 22 July 2026. The raw-file SHA-256 is `560e5c1a1873
 
 After year restriction, 20 exact duplicates, 3,063 late calls and 6,081 `Roofs/ Roof spaces` target records were removed sequentially. The main cohort contains {cohort['rows']:,} incidents, {cohort['positive_count']:,} larger fires ({cohort['positive_prevalence']:.1%}).
 
+This roof exclusion is an estimand decision, not a claim that the official statistics use the same binary definition. The study's main target follows the unambiguous room→floor→whole-building ordering; `Roofs/ Roof spaces` cannot be placed unambiguously on that scale. Official FIRE0304 instead counts roofs/roof spaces as a larger fire. The explicitly reported official-definition sensitivity maps it positive and tests the consequence of that convention.
+
 ## Validation and modelling
 
-Temporal train/validation/test years are 2010/11–2019/20, 2020/21–2021/22 and 2022/23–2023/24. The stratified random comparator has exactly the same 159,533/23,824/25,814 sample sizes. All imputing and encoding were pipeline-fitted on development data only. Compact hyperparameter selection used validation PR-AUC; analytical classification thresholds maximised validation F1. Configurations and thresholds were programmatically recorded before the single within-run holdout-evaluation phase.
+Temporal train/validation/test years are 2010/11–2019/20, 2020/21–2021/22 and 2022/23–2023/24. The stratified random comparator has exactly the same 159,533/23,824/25,814 sample sizes. All imputing and encoding were pipeline-fitted on development data only. Compact hyperparameter selection used validation PR-AUC; analytical classification thresholds maximised validation F1. Each threshold was selected from validation probabilities produced by a train-fitted model, then held fixed while the selected model was refitted on train+validation. Because refitting can shift the probability distribution, threshold-dependent test metrics are descriptive operating-point summaries; threshold-free PR-AUC remains primary, and no test-set retuning occurred. Configurations and thresholds were programmatically recorded before the single within-run holdout-evaluation phase.
+
+{shared_configuration_text} selected identical hyperparameters under random and temporal development designs. In particular, the primary XGBoost RQ1 contrast is not confounded by comparing different XGBoost configurations; Logistic Regression selected different regularisation strengths (`C=1.0` random versus `C=0.1` temporal).
 
 The main model comparison is Block B, the retrospective incident-information model:
 
@@ -293,11 +360,15 @@ For validation-selected families, temporal PR-AUC rose from {selected_temporal.l
 
 ## Temporal stability and sensitivity
 
-Expanding-window annual PR-AUC ranged from {expanding.pr_auc.min():.3f} to {expanding.pr_auc.max():.3f}; 2023/24 was {expanding.iloc[-1].pr_auc:.3f}. No policy or COVID attribution is made because this design establishes performance variation, not its cause.
+{_format_rows(expanding, ['test_year','positive_prevalence','pr_auc','pr_auc_absolute_lift','normalized_pr_auc','roc_auc'])}
+
+Across these {len(expanding)} later-year folds, raw PR-AUC ranged from {expanding.pr_auc.min():.3f} to {expanding.pr_auc.max():.3f} (range {expanding_pr_auc_range:.3f}) and had the same rank ordering as prevalence (Spearman {expanding_spearman:.3f}). In contrast, ROC-AUC varied by only {expanding_roc_range:.3f}, PR-AUC absolute lift by {expanding_lift_range:.3f}, and normalized PR-AUC by {expanding_normalized_range:.3f}. This pattern supports relatively stable later-year discrimination and shows that the apparent raw PR-AUC decline substantially tracks the changing prevalence baseline. With only four annual folds, it does not establish that prevalence explains all variation or identify why prevalence changed.
+
+Expanding-window F1, precision, recall and balanced accuracy use a fixed descriptive threshold of 0.5 and are not directly comparable with the main table's validation-F1 operating point. The 2020/21–2021/22 validation window overlaps the COVID-disrupted period, and 2020/21 has the highest expanding-window prevalence ({expanding.iloc[0].positive_prevalence:.3f}); this may affect selected settings and thresholds. No policy or COVID attribution is made.
 
 {_format_rows(sensitivity[['analysis','test_period','n','positive_prevalence','pr_auc','roc_auc','f1']], ['analysis','test_period','n','positive_prevalence','pr_auc','roc_auc','f1'])}
 
-The mandatory roof-positive definition increased temporal Block B PR-AUC to {sensitivity.loc[sensitivity.analysis == 'roofs_roof_spaces_positive','pr_auc'].iloc[0]:.3f}. Reintroducing late calls produced {sensitivity.loc[sensitivity.analysis == 'include_late_calls','pr_auc'].iloc[0]:.3f}. A separate 2024/25 check excluding Suffolk produced {sensitivity.loc[sensitivity.analysis == 'include_2024_25_exclude_suffolk','pr_auc'].iloc[0]:.3f}; it remains secondary because the main time window was locked before modelling. Across three prespecified random seeds, PR-AUC ranged from {stability.pr_auc.min():.3f} to {stability.pr_auc.max():.3f}.
+The official FIRE0304-aligned roof-positive definition increased temporal Block B PR-AUC to {sensitivity.loc[sensitivity.analysis == 'roofs_roof_spaces_positive','pr_auc'].iloc[0]:.3f}. Reintroducing late calls produced {sensitivity.loc[sensitivity.analysis == 'include_late_calls','pr_auc'].iloc[0]:.3f}. A separate 2024/25 check excluding Suffolk produced {sensitivity.loc[sensitivity.analysis == 'include_2024_25_exclude_suffolk','pr_auc'].iloc[0]:.3f}; it remains secondary because the main time window was locked before modelling. Across three prespecified random seeds, PR-AUC ranged from {stability.pr_auc.min():.3f} to {stability.pr_auc.max():.3f}.
 
 ## Limitations
 
@@ -306,8 +377,11 @@ The mandatory roof-positive definition increased temporal Block B PR-AUC to {sen
 - Block B is retrospective and not strictly dispatch-time information.
 - Block C's exceptional performance is dominated by proximity to the final outcome and must remain a separate prognostic scenario.
 - PR-AUC is prevalence-sensitive; cross-split and subgroup comparisons require their respective positive prevalences.
+- Hyperparameters and analytical thresholds were selected using 2020/21–2021/22, a validation window that overlaps the COVID-disrupted period and includes an unusually high-prevalence first year.
+- Validation-selected thresholds were transferred to models refitted on train+validation; any probability shift makes threshold-dependent test metrics descriptive rather than re-optimised operating points.
 - Subgroup and permutation results are descriptive model diagnostics, not evidence of differential or variable-level causal effects.
 - Temporal performance differences do not by themselves identify why distributions changed.
+- The publisher URL can be replaced in future. Checksums verify retained files but cannot recover them; the ODS and reproducibility Parquet files require a separate durable institutional deposit.
 
 ## Reproducibility
 
@@ -324,9 +398,16 @@ def _write_methods_receipt() -> None:
     pre_test = json.loads((ROOT / "outputs/metrics/pre_test_model_config.json").read_text(encoding="utf-8"))
     post_test = json.loads((ROOT / "outputs/metrics/post_test_evaluation_receipt.json").read_text(encoding="utf-8"))
     runtime = json.loads((ROOT / "outputs/metrics/runtime_environment.json").read_text(encoding="utf-8"))
+    archive = json.loads((ROOT / "outputs/metrics/data_archive_manifest.json").read_text(encoding="utf-8"))
+    expanding = pd.read_csv(ROOT / "outputs/tables/expanding_window_performance.csv")
     bootstrap = pd.read_csv(ROOT / "outputs/tables/bootstrap_confidence_intervals.csv")
     overlap = bootstrap[bootstrap.design == "random-minus-temporal"].iloc[0]
     policy = load_yaml("config/feature_policy.yaml")
+    shared_configuration_families = [
+        family for family in ("logistic_regression", "random_forest", "xgboost")
+        if pre_test["selected_hyperparameters"]["temporal"][family]
+        == pre_test["selected_hyperparameters"]["random"][family]
+    ]
     manifest = sorted(set([
         str(path.relative_to(ROOT)).replace("\\", "/")
         for base in (ROOT / "outputs", ROOT / "reports")
@@ -347,6 +428,8 @@ def _write_methods_receipt() -> None:
 - SHA-256: `{metadata['sha256']}`
 - ODS sheets: {json.dumps(metadata['all_sheets'])}
 - Data sheet: {metadata['data_sheet']}
+- Data archive manifest: `{json.dumps(archive['files'])}`
+- The source ODS and reproducibility Parquet files are excluded from Git and require a separate durable institution-controlled deposit. Checksums verify retained files but cannot recover them after a publisher URL is replaced; this manifest is not itself an archive.
 
 ## Cohort and target
 
@@ -354,7 +437,8 @@ def _write_methods_receipt() -> None:
 - Exclusions, in order: outside main years; complete duplicate rows; `LATE_CALL=yes`; main-target exclusions (`Roofs/ Roof spaces` and any unmappable/missing category).
 - Final rows: {cohort['rows']}; positives: {cohort['positive_count']}; prevalence: {cohort['positive_prevalence']:.8f}.
 - Exact target mapping: `{json.dumps(cohort['target_mapping'])}`.
-- Roof sensitivity: map `Roofs/ Roof spaces` to 1.
+- Main-estimand rationale: the room→floor→whole-building ordering maps six categories unambiguously; `Roofs/ Roof spaces` is not assigned because it cannot be located unambiguously on that ordering.
+- Official-definition sensitivity: FIRE0304 counts roofs/roof spaces as a larger fire, so map `Roofs/ Roof spaces` to 1. The 2024/25 sensitivity reproduces the official approximately 26% larger-fire proportion.
 
 ## Feature blocks
 
@@ -374,6 +458,9 @@ def _write_methods_receipt() -> None:
 - Random comparator: stratified sampling with exactly matching train/validation/test counts.
 - Primary seed: {cfg['random_seed']}; stability seeds: {cfg['random_stability_seeds']}.
 - Selection metric: validation PR-AUC. Threshold: validation F1 maximum, an analytical operating point rather than an operational optimum.
+- Threshold provenance: thresholds come from validation probabilities of train-fitted models and are then held fixed when selected models are refitted on train+validation. Refitting can shift probabilities, so threshold-dependent test metrics are descriptive; no threshold is reselected on test data.
+- The validation years 2020/21–2021/22 overlap the COVID-disrupted period. The first expanding-window year has positive prevalence {expanding.iloc[0].positive_prevalence:.6f}; this design feature may affect selection and thresholds but does not identify a COVID effect.
+- Expanding-window thresholded metrics use fixed threshold 0.5 and are not directly comparable with main-table thresholded metrics. Annual PR-AUC, prevalence-relative summaries and ROC-AUC are the intended temporal-stability comparisons.
 - Holdout evaluation count in this analysis run: {post_test['test_evaluation_count_this_run']}.
 
 ## Within-run evaluation records
@@ -388,6 +475,7 @@ Model configurations and thresholds were programmatically recorded before holdou
 
 - Full candidate ranges and results: `reports/hyperparameter_plan.md` and `outputs/tables/hyperparameter_search_results.csv`.
 - Selected parameters: `{json.dumps(pre_test['selected_hyperparameters'])}`
+- Families with identical random and temporal selected hyperparameters: `{shared_configuration_families}`. This includes Random Forest and the primary XGBoost comparator; Logistic Regression differs (`C=1.0` random, `C=0.1` temporal).
 - Validation-selected family by block: `{json.dumps(pre_test['selected_family_by_block'])}`
 - Locked thresholds: `{json.dumps(pre_test['locked_thresholds'])}`
 - XGBoost device: `{pre_test['xgboost_device']}`; tree method: `hist`.
@@ -433,6 +521,7 @@ def build_report() -> None:
         package: importlib.metadata.version(package) for package in packages
     }
     runtime_path.write_text(json.dumps(runtime, indent=2), encoding="utf-8")
+    _write_data_archive_manifest()
     _workflow_figure(); _annual_figure(); _random_temporal_figure(); _expanding_figure()
     _block_figure(); _confusion_and_calibration(); _subgroup_figure()
     _bootstrap_figure(); _grouped_permutation_figure()

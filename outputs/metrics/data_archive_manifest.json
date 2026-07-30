@@ -1,0 +1,28 @@
+{
+  "purpose": "checksums for a separate durable dissertation data deposit",
+  "external_archive_required": true,
+  "git_policy": "raw and reproducibility Parquet data are intentionally excluded from Git",
+  "files": [
+    {
+      "role": "official source ODS",
+      "path": "data/raw/Other_building_fires_dataset.ods",
+      "exists": true,
+      "size_bytes": 45066461,
+      "sha256": "560e5c1a18731cf8189b28471f6813675d6f95f447d680ec5603d9bb97718595"
+    },
+    {
+      "role": "one-time imported raw Parquet",
+      "path": "data/interim/other_building_fires_raw.parquet",
+      "exists": true,
+      "size_bytes": 3279580,
+      "sha256": "504a3520301a7d013d4ae93b0f753887839f1564d22003f4936059fbba2c8245"
+    },
+    {
+      "role": "main analysis cohort Parquet",
+      "path": "data/processed/analysis_cohort.parquet",
+      "exists": true,
+      "size_bytes": 3932124,
+      "sha256": "d595b7a5a161646dbc1068383c8137c497b7eb7d6df64c1b737799a1d9d583f3"
+    }
+  ]
+}

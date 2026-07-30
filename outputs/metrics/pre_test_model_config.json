@@ -1,6 +1,6 @@
 {
   "record_type": "internal_within_run_pre_test_configuration",
-  "generated_at_utc": "2026-07-30T22:50:52.696824+00:00",
+  "generated_at_utc": "2026-07-30T23:36:49.469778+00:00",
   "selection_metric": "validation PR-AUC",
   "threshold_rule": "maximum validation F1",
   "xgboost_device": "cuda",
@@ -67,7 +67,7 @@
       "B": {
         "dummy": 0.2499106767878746,
         "logistic_regression": 0.2742215096950531,
-        "random_forest": 0.3519588449756026,
+        "random_forest": 0.3519588449756025,
         "xgboost": 0.2836891710758209
       },
       "C": {
@@ -93,7 +93,7 @@
       "C": {
         "dummy": 0.25722577773877503,
         "logistic_regression": 0.4314391613006592,
-        "random_forest": 0.4773128881043004,
+        "random_forest": 0.47731288810430045,
         "xgboost": 0.5401079654693604
       }
     }

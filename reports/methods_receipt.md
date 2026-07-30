@@ -13,6 +13,8 @@
 - SHA-256: `560e5c1a18731cf8189b28471f6813675d6f95f447d680ec5603d9bb97718595`
 - ODS sheets: [{"sheet_name": "Cover_sheet", "rows": 14, "columns": 1}, {"sheet_name": "Datasheet", "rows": 490412, "columns": 42}, {"sheet_name": "config", "rows": 6, "columns": 2}]
 - Data sheet: Datasheet
+- Data archive manifest: `[{"role": "official source ODS", "path": "data/raw/Other_building_fires_dataset.ods", "exists": true, "size_bytes": 45066461, "sha256": "560e5c1a18731cf8189b28471f6813675d6f95f447d680ec5603d9bb97718595"}, {"role": "one-time imported raw Parquet", "path": "data/interim/other_building_fires_raw.parquet", "exists": true, "size_bytes": 3279580, "sha256": "504a3520301a7d013d4ae93b0f753887839f1564d22003f4936059fbba2c8245"}, {"role": "main analysis cohort Parquet", "path": "data/processed/analysis_cohort.parquet", "exists": true, "size_bytes": 3932124, "sha256": "d595b7a5a161646dbc1068383c8137c497b7eb7d6df64c1b737799a1d9d583f3"}]`
+- The source ODS and reproducibility Parquet files are excluded from Git and require a separate durable institution-controlled deposit. Checksums verify retained files but cannot recover them after a publisher URL is replaced; this manifest is not itself an archive.
 
 ## Cohort and target
 
@@ -20,7 +22,8 @@
 - Exclusions, in order: outside main years; complete duplicate rows; `LATE_CALL=yes`; main-target exclusions (`Roofs/ Roof spaces` and any unmappable/missing category).
 - Final rows: 209171; positives: 53804; prevalence: 0.25722495.
 - Exact target mapping: `{"Whole Building/ Affecting more than 2 floors": 1, "Limited to room of origin": 0, "No fire damage": 0, "Roofs/ Roof spaces": null, "Limited to floor of origin (not whole building)": 1, "Limited to item 1st ignited": 0, "Limited to 2 floors": 1}`.
-- Roof sensitivity: map `Roofs/ Roof spaces` to 1.
+- Main-estimand rationale: the room→floor→whole-building ordering maps six categories unambiguously; `Roofs/ Roof spaces` is not assigned because it cannot be located unambiguously on that ordering.
+- Official-definition sensitivity: FIRE0304 counts roofs/roof spaces as a larger fire, so map `Roofs/ Roof spaces` to 1. The 2024/25 sensitivity reproduces the official approximately 26% larger-fire proportion.
 
 ## Feature blocks
 
@@ -40,22 +43,26 @@
 - Random comparator: stratified sampling with exactly matching train/validation/test counts.
 - Primary seed: 20260801; stability seeds: [20260801, 20260802, 20260803].
 - Selection metric: validation PR-AUC. Threshold: validation F1 maximum, an analytical operating point rather than an operational optimum.
+- Threshold provenance: thresholds come from validation probabilities of train-fitted models and are then held fixed when selected models are refitted on train+validation. Refitting can shift probabilities, so threshold-dependent test metrics are descriptive; no threshold is reselected on test data.
+- The validation years 2020/21–2021/22 overlap the COVID-disrupted period. The first expanding-window year has positive prevalence 0.325431; this design feature may affect selection and thresholds but does not identify a COVID effect.
+- Expanding-window thresholded metrics use fixed threshold 0.5 and are not directly comparable with main-table thresholded metrics. Annual PR-AUC, prevalence-relative summaries and ROC-AUC are the intended temporal-stability comparisons.
 - Holdout evaluation count in this analysis run: 1.
 
 ## Within-run evaluation records
 
 Model configurations and thresholds were programmatically recorded before holdout evaluation within each analysis run. This is an internal procedural safeguard, not an externally timestamped preregistration.
 
-- Pre-test record: `outputs/metrics/pre_test_model_config.json` (`internal_within_run_pre_test_configuration`), generated 2026-07-30T22:50:52.696824+00:00.
-- Post-test record: `outputs/metrics/post_test_evaluation_receipt.json` (`internal_within_run_post_test_evaluation_receipt`), generated 2026-07-30T22:56:39.695483+00:00.
-- The post-test record references pre-test SHA-256 `fdd3b98035488c4461f0b023ef50b99cb0e78f0adf8e2aece55794b914e290a8`. These files provide an auditable within-run order record; they do not independently verify researcher history outside the run.
+- Pre-test record: `outputs/metrics/pre_test_model_config.json` (`internal_within_run_pre_test_configuration`), generated 2026-07-30T23:36:49.469778+00:00.
+- Post-test record: `outputs/metrics/post_test_evaluation_receipt.json` (`internal_within_run_post_test_evaluation_receipt`), generated 2026-07-30T23:42:11.095077+00:00.
+- The post-test record references pre-test SHA-256 `bb43db178568e72d856aae8949978fc0b5471e87e386d15b853123a5c99052c1`. These files provide an auditable within-run order record; they do not independently verify researcher history outside the run.
 
 ## Hyperparameters and thresholds
 
 - Full candidate ranges and results: `reports/hyperparameter_plan.md` and `outputs/tables/hyperparameter_search_results.csv`.
 - Selected parameters: `{"temporal": {"logistic_regression": {"C": 0.1}, "random_forest": {"n_estimators": 200, "max_depth": null, "min_samples_leaf": 5, "max_features": "sqrt"}, "xgboost": {"n_estimators": 200, "learning_rate": 0.1, "max_depth": 6, "min_child_weight": 5, "subsample": 0.8, "colsample_bytree": 0.8}}, "random": {"logistic_regression": {"C": 1.0}, "random_forest": {"n_estimators": 200, "max_depth": null, "min_samples_leaf": 5, "max_features": "sqrt"}, "xgboost": {"n_estimators": 200, "learning_rate": 0.1, "max_depth": 6, "min_child_weight": 5, "subsample": 0.8, "colsample_bytree": 0.8}}}`
+- Families with identical random and temporal selected hyperparameters: `['random_forest', 'xgboost']`. This includes Random Forest and the primary XGBoost comparator; Logistic Regression differs (`C=1.0` random, `C=0.1` temporal).
 - Validation-selected family by block: `{"temporal": {"A": "xgboost", "B": "xgboost", "C": "xgboost"}, "random": {"A": "xgboost", "B": "xgboost", "C": "xgboost"}}`
-- Locked thresholds: `{"temporal": {"A": {"dummy": 0.2499106767878746, "logistic_regression": 0.2867622375488281, "random_forest": 0.2722170425235016, "xgboost": 0.33036476373672485}, "B": {"dummy": 0.2499106767878746, "logistic_regression": 0.2742215096950531, "random_forest": 0.3519588449756026, "xgboost": 0.2836891710758209}, "C": {"dummy": 0.2499106767878746, "logistic_regression": 0.5661454796791077, "random_forest": 0.4307341088371494, "xgboost": 0.3571653366088867}}, "random": {"A": {"dummy": 0.25722577773877503, "logistic_regression": 0.272072970867157, "random_forest": 0.29698505349039045, "xgboost": 0.29469117522239685}, "B": {"dummy": 0.25722577773877503, "logistic_regression": 0.30903926491737366, "random_forest": 0.3399175365666454, "xgboost": 0.34557846188545227}, "C": {"dummy": 0.25722577773877503, "logistic_regression": 0.4314391613006592, "random_forest": 0.4773128881043004, "xgboost": 0.5401079654693604}}}`
+- Locked thresholds: `{"temporal": {"A": {"dummy": 0.2499106767878746, "logistic_regression": 0.2867622375488281, "random_forest": 0.2722170425235016, "xgboost": 0.33036476373672485}, "B": {"dummy": 0.2499106767878746, "logistic_regression": 0.2742215096950531, "random_forest": 0.3519588449756025, "xgboost": 0.2836891710758209}, "C": {"dummy": 0.2499106767878746, "logistic_regression": 0.5661454796791077, "random_forest": 0.4307341088371494, "xgboost": 0.3571653366088867}}, "random": {"A": {"dummy": 0.25722577773877503, "logistic_regression": 0.272072970867157, "random_forest": 0.29698505349039045, "xgboost": 0.29469117522239685}, "B": {"dummy": 0.25722577773877503, "logistic_regression": 0.30903926491737366, "random_forest": 0.3399175365666454, "xgboost": 0.34557846188545227}, "C": {"dummy": 0.25722577773877503, "logistic_regression": 0.4314391613006592, "random_forest": 0.47731288810430045, "xgboost": 0.5401079654693604}}}`
 - XGBoost device: `cuda`; tree method: `hist`.
 
 ## Fixed-model uncertainty and prevalence context
@@ -126,6 +133,7 @@ Model configurations and thresholds were programmatically recorded before holdou
 - `outputs/figures/10_grouped_permutation_importance.png`
 - `outputs/metrics/audit_receipt.json`
 - `outputs/metrics/cohort_receipt.json`
+- `outputs/metrics/data_archive_manifest.json`
 - `outputs/metrics/output_manifest.json`
 - `outputs/metrics/post_test_evaluation_receipt.json`
 - `outputs/metrics/pre_test_model_config.json`

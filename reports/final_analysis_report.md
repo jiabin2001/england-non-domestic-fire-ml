@@ -12,9 +12,13 @@ The official ODS was updated 22 July 2026. The raw-file SHA-256 is `560e5c1a1873
 
 After year restriction, 20 exact duplicates, 3,063 late calls and 6,081 `Roofs/ Roof spaces` target records were removed sequentially. The main cohort contains 209,171 incidents, 53,804 larger fires (25.7%).
 
+This roof exclusion is an estimand decision, not a claim that the official statistics use the same binary definition. The study's main target follows the unambiguous room→floor→whole-building ordering; `Roofs/ Roof spaces` cannot be placed unambiguously on that scale. Official FIRE0304 instead counts roofs/roof spaces as a larger fire. The explicitly reported official-definition sensitivity maps it positive and tests the consequence of that convention.
+
 ## Validation and modelling
 
-Temporal train/validation/test years are 2010/11–2019/20, 2020/21–2021/22 and 2022/23–2023/24. The stratified random comparator has exactly the same 159,533/23,824/25,814 sample sizes. All imputing and encoding were pipeline-fitted on development data only. Compact hyperparameter selection used validation PR-AUC; analytical classification thresholds maximised validation F1. Configurations and thresholds were programmatically recorded before the single within-run holdout-evaluation phase.
+Temporal train/validation/test years are 2010/11–2019/20, 2020/21–2021/22 and 2022/23–2023/24. The stratified random comparator has exactly the same 159,533/23,824/25,814 sample sizes. All imputing and encoding were pipeline-fitted on development data only. Compact hyperparameter selection used validation PR-AUC; analytical classification thresholds maximised validation F1. Each threshold was selected from validation probabilities produced by a train-fitted model, then held fixed while the selected model was refitted on train+validation. Because refitting can shift the probability distribution, threshold-dependent test metrics are descriptive operating-point summaries; threshold-free PR-AUC remains primary, and no test-set retuning occurred. Configurations and thresholds were programmatically recorded before the single within-run holdout-evaluation phase.
+
+Random Forest, XGBoost selected identical hyperparameters under random and temporal development designs. In particular, the primary XGBoost RQ1 contrast is not confounded by comparing different XGBoost configurations; Logistic Regression selected different regularisation strengths (`C=1.0` random versus `C=0.1` temporal).
 
 The main model comparison is Block B, the retrospective incident-information model:
 
@@ -63,7 +67,16 @@ For validation-selected families, temporal PR-AUC rose from 0.642 in Block B to 
 
 ## Temporal stability and sensitivity
 
-Expanding-window annual PR-AUC ranged from 0.628 to 0.687; 2023/24 was 0.628. No policy or COVID attribution is made because this design establishes performance variation, not its cause.
+| test_year | positive_prevalence | pr_auc | pr_auc_absolute_lift | normalized_pr_auc | roc_auc |
+|---|---|---|---|---|---|
+| 2020/21 | 0.325 | 0.687 | 0.362 | 0.537 | 0.840 |
+| 2021/22 | 0.272 | 0.643 | 0.371 | 0.510 | 0.840 |
+| 2022/23 | 0.286 | 0.655 | 0.369 | 0.517 | 0.838 |
+| 2023/24 | 0.244 | 0.628 | 0.384 | 0.508 | 0.842 |
+
+Across these 4 later-year folds, raw PR-AUC ranged from 0.628 to 0.687 (range 0.060) and had the same rank ordering as prevalence (Spearman 1.000). In contrast, ROC-AUC varied by only 0.004, PR-AUC absolute lift by 0.022, and normalized PR-AUC by 0.029. This pattern supports relatively stable later-year discrimination and shows that the apparent raw PR-AUC decline substantially tracks the changing prevalence baseline. With only four annual folds, it does not establish that prevalence explains all variation or identify why prevalence changed.
+
+Expanding-window F1, precision, recall and balanced accuracy use a fixed descriptive threshold of 0.5 and are not directly comparable with the main table's validation-F1 operating point. The 2020/21–2021/22 validation window overlaps the COVID-disrupted period, and 2020/21 has the highest expanding-window prevalence (0.325); this may affect selected settings and thresholds. No policy or COVID attribution is made.
 
 | analysis | test_period | n | positive_prevalence | pr_auc | roc_auc | f1 |
 |---|---|---|---|---|---|---|
@@ -72,7 +85,7 @@ Expanding-window annual PR-AUC ranged from 0.628 to 0.687; 2023/24 was 0.628. No
 | include_late_calls | 2022/23-2023/24 | 26108 | 0.263 | 0.640 | 0.840 | 0.639 |
 | include_2024_25_exclude_suffolk | 2024/25 | 12553 | 0.241 | 0.630 | 0.846 | 0.623 |
 
-The mandatory roof-positive definition increased temporal Block B PR-AUC to 0.659. Reintroducing late calls produced 0.640. A separate 2024/25 check excluding Suffolk produced 0.630; it remains secondary because the main time window was locked before modelling. Across three prespecified random seeds, PR-AUC ranged from 0.651 to 0.658.
+The official FIRE0304-aligned roof-positive definition increased temporal Block B PR-AUC to 0.659. Reintroducing late calls produced 0.640. A separate 2024/25 check excluding Suffolk produced 0.630; it remains secondary because the main time window was locked before modelling. Across three prespecified random seeds, PR-AUC ranged from 0.651 to 0.658.
 
 ## Limitations
 
@@ -81,8 +94,11 @@ The mandatory roof-positive definition increased temporal Block B PR-AUC to 0.65
 - Block B is retrospective and not strictly dispatch-time information.
 - Block C's exceptional performance is dominated by proximity to the final outcome and must remain a separate prognostic scenario.
 - PR-AUC is prevalence-sensitive; cross-split and subgroup comparisons require their respective positive prevalences.
+- Hyperparameters and analytical thresholds were selected using 2020/21–2021/22, a validation window that overlaps the COVID-disrupted period and includes an unusually high-prevalence first year.
+- Validation-selected thresholds were transferred to models refitted on train+validation; any probability shift makes threshold-dependent test metrics descriptive rather than re-optimised operating points.
 - Subgroup and permutation results are descriptive model diagnostics, not evidence of differential or variable-level causal effects.
 - Temporal performance differences do not by themselves identify why distributions changed.
+- The publisher URL can be replaced in future. Checksums verify retained files but cannot recover them; the ODS and reproducibility Parquet files require a separate durable institutional deposit.
 
 ## Reproducibility
 
