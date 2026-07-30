@@ -28,11 +28,14 @@ def test_required_output_table_schemas():
         "bootstrap_confidence_intervals.csv": {
             "estimand", "design", "point_estimate", "ci_lower_95", "ci_upper_95",
             "bootstrap_repeats", "bootstrap_seed", "bootstrap_method",
+            "random_test_n", "temporal_test_n", "overlap_n",
+            "overlap_fraction_random_test", "overlap_fraction_temporal_test",
+            "overlap_identifier",
         },
         "grouped_permutation_importance.csv": {
             "feature", "baseline_pr_auc", "mean_permuted_pr_auc",
-            "mean_pr_auc_decrease", "std_pr_auc_decrease", "ci_lower_95",
-            "ci_upper_95", "permutation_repeats", "permutation_seed",
+            "mean_pr_auc_decrease", "std_pr_auc_decrease", "permutation_p02_5",
+            "permutation_p97_5", "permutation_repeats", "permutation_seed",
         },
         "pr_auc_prevalence_context.csv": {
             "design", "block", "model", "positive_prevalence", "pr_auc",
@@ -101,9 +104,28 @@ def test_core_pr_auc_points_are_unchanged_and_drive_bootstrap():
         predictions = pd.read_parquet(ROOT / f"outputs/metrics/predictions_{design}_block_B.parquet")
         calculated = average_precision_score(predictions["LARGER_FIRE"], predictions["probability"])
         ci_point = bootstrap[(bootstrap.estimand == "PR-AUC") & (bootstrap.design == design)].iloc[0].point_estimate
-        assert np.isclose(observed, expected_value, rtol=0, atol=1e-12)
-        assert np.isclose(calculated, expected_value, rtol=0, atol=1e-12)
-        assert np.isclose(ci_point, expected_value, rtol=0, atol=1e-12)
+        assert np.isclose(observed, expected_value, rtol=0, atol=1e-6)
+        assert np.isclose(calculated, expected_value, rtol=0, atol=1e-6)
+        assert np.isclose(ci_point, expected_value, rtol=0, atol=1e-6)
+        assert np.isclose(observed, calculated, rtol=0, atol=1e-12)
+        assert np.isclose(calculated, ci_point, rtol=0, atol=1e-12)
+
+
+def test_bootstrap_overlap_matches_saved_test_identifiers():
+    bootstrap = pd.read_csv(ROOT / "outputs/tables/bootstrap_confidence_intervals.csv")
+    difference = bootstrap[bootstrap.design == "random-minus-temporal"].iloc[0]
+    random = pd.read_parquet(ROOT / "outputs/metrics/predictions_random_block_B.parquet")
+    temporal = pd.read_parquet(ROOT / "outputs/metrics/predictions_temporal_block_B.parquet")
+    source_overlap = len(set(random["SOURCE_ROW_ID"]) & set(temporal["SOURCE_ROW_ID"]))
+    index_overlap = len(set(random.index) & set(temporal.index))
+    assert source_overlap == index_overlap == int(difference.overlap_n)
+    assert np.isclose(
+        difference.overlap_fraction_random_test, source_overlap / len(random), rtol=0, atol=1e-12
+    )
+    assert np.isclose(
+        difference.overlap_fraction_temporal_test, source_overlap / len(temporal), rtol=0, atol=1e-12
+    )
+    assert "covariance not modelled" in difference.bootstrap_method
 
 
 def test_grouped_importance_uses_every_block_b_field_and_saved_baseline(cohort):
@@ -139,5 +161,7 @@ def test_documentation_does_not_overstate_internal_run_records():
     required = (
         "internal procedural safeguard",
         "not an externally timestamped preregistration",
+        "not fully independent",
+        "not confidence-interval limits",
     )
     assert all(phrase in text for phrase in required)

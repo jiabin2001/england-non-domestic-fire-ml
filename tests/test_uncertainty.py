@@ -12,13 +12,15 @@ from fireml.uncertainty import (
 def _prediction_frames() -> tuple[pd.DataFrame, pd.DataFrame]:
     labels = np.array([0] * 30 + [1] * 10)
     random = pd.DataFrame({
+        "SOURCE_ROW_ID": np.arange(40),
         "LARGER_FIRE": labels,
         "probability": np.linspace(0.02, 0.95, labels.size),
-    })
+    }, index=np.arange(40))
     temporal = pd.DataFrame({
+        "SOURCE_ROW_ID": np.arange(30, 70),
         "LARGER_FIRE": labels,
         "probability": np.linspace(0.05, 0.85, labels.size) ** 1.2,
-    })
+    }, index=np.arange(30, 70))
     return random, temporal
 
 
@@ -48,6 +50,10 @@ def test_bootstrap_is_reproducible_bounded_and_non_mutating():
     assert np.isfinite(difference["ci_lower_95"])
     assert np.isfinite(difference["ci_upper_95"])
     assert "independent" in difference["bootstrap_method"]
+    assert "covariance not modelled" in difference["bootstrap_method"]
+    assert difference["overlap_n"] == 10
+    assert difference["overlap_fraction_random_test"] == 0.25
+    assert difference["overlap_fraction_temporal_test"] == 0.25
 
 
 def test_prevalence_context_handles_all_positive_edge_case():

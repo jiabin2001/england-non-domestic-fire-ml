@@ -1,4 +1,4 @@
-feature,baseline_pr_auc,mean_permuted_pr_auc,mean_pr_auc_decrease,std_pr_auc_decrease,ci_lower_95,ci_upper_95,permutation_repeats,permutation_seed,design,block,model,evaluation_set
+feature,baseline_pr_auc,mean_permuted_pr_auc,mean_pr_auc_decrease,std_pr_auc_decrease,permutation_p02_5,permutation_p97_5,permutation_repeats,permutation_seed,design,block,model,evaluation_set
 BUILDING_TYPE,0.6419521680039855,0.5329342421231902,0.10901792588079523,0.003070187163001121,0.10290691743877692,0.11375448763660419,30,20260821,temporal,B,validation-selected XGBoost,2022/23-2023/24 temporal test set
 ITEM_IGNITED,0.6419521680039855,0.6082985308426331,0.03365363716135228,0.003430061763512791,0.02749647957506254,0.04078431598514837,30,20260821,temporal,B,validation-selected XGBoost,2022/23-2023/24 temporal test set
 ALARM_SYSTEM,0.6419521680039855,0.6110035012538738,0.03094866675011176,0.0032059791529257258,0.025406827661750002,0.03602563913240185,30,20260821,temporal,B,validation-selected XGBoost,2022/23-2023/24 temporal test set

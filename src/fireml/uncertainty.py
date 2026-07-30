@@ -45,19 +45,60 @@ def stratified_bootstrap_pr_auc(
     return draws
 
 
+def holdout_overlap_summary(
+    random_predictions: pd.DataFrame,
+    temporal_predictions: pd.DataFrame,
+) -> dict[str, str | int | float]:
+    """Count random/temporal test overlap and cross-check both saved identifiers."""
+    if "SOURCE_ROW_ID" in random_predictions and "SOURCE_ROW_ID" in temporal_predictions:
+        random_ids = pd.Index(random_predictions["SOURCE_ROW_ID"])
+        temporal_ids = pd.Index(temporal_predictions["SOURCE_ROW_ID"])
+        if not random_ids.is_unique or not temporal_ids.is_unique:
+            raise ValueError("SOURCE_ROW_ID must be unique within each saved test set.")
+        overlap_n = len(random_ids.intersection(temporal_ids))
+        identifier = "SOURCE_ROW_ID (cross-checked against cohort index)"
+        random_index = pd.Index(random_predictions.index)
+        temporal_index = pd.Index(temporal_predictions.index)
+        if not random_index.is_unique or not temporal_index.is_unique:
+            raise ValueError("Cohort index must be unique within each saved test set.")
+        index_overlap_n = len(random_index.intersection(temporal_index))
+        if index_overlap_n != overlap_n:
+            raise ValueError("SOURCE_ROW_ID and cohort-index overlap counts disagree.")
+    else:
+        random_index = pd.Index(random_predictions.index)
+        temporal_index = pd.Index(temporal_predictions.index)
+        if not random_index.is_unique or not temporal_index.is_unique:
+            raise ValueError("Cohort index must be unique within each saved test set.")
+        overlap_n = len(random_index.intersection(temporal_index))
+        identifier = "cohort index"
+
+    random_n, temporal_n = len(random_predictions), len(temporal_predictions)
+    if random_n == 0 or temporal_n == 0:
+        raise ValueError("Saved test prediction sets must be non-empty.")
+    return {
+        "random_test_n": random_n,
+        "temporal_test_n": temporal_n,
+        "overlap_n": overlap_n,
+        "overlap_fraction_random_test": overlap_n / random_n,
+        "overlap_fraction_temporal_test": overlap_n / temporal_n,
+        "overlap_identifier": identifier,
+    }
+
+
 def build_bootstrap_ci_table(
     random_predictions: pd.DataFrame,
     temporal_predictions: pd.DataFrame,
     repeats: int = 2000,
     seed: int = 20260811,
 ) -> pd.DataFrame:
-    """Summarise fixed-model PR-AUC uncertainty for the two independent holdouts."""
+    """Summarise fixed-model PR-AUC uncertainty for two partially overlapping holdouts."""
     required = {"LARGER_FIRE", "probability"}
     for design, frame in (("random", random_predictions), ("temporal", temporal_predictions)):
         missing = required - set(frame.columns)
         if missing:
             raise ValueError(f"{design} predictions missing columns: {sorted(missing)}")
 
+    overlap = holdout_overlap_summary(random_predictions, temporal_predictions)
     child_seeds = np.random.SeedSequence(seed).spawn(2)
     random_rng, temporal_rng = (np.random.default_rng(child) for child in child_seeds)
     random_y = random_predictions["LARGER_FIRE"].to_numpy(dtype=int, copy=True)
@@ -94,6 +135,7 @@ def build_bootstrap_ci_table(
             "bootstrap_repeats": repeats,
             "bootstrap_seed": seed,
             "bootstrap_method": method,
+            **overlap,
         }
 
     return pd.DataFrame([
@@ -116,7 +158,7 @@ def build_bootstrap_ci_table(
             "random-minus-temporal",
             random_point - temporal_point,
             difference_draws,
-            "conditional independent stratified percentile bootstrap",
+            "approximate independent stratified percentile bootstrap; overlap covariance not modelled",
         ),
     ])
 

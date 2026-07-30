@@ -28,7 +28,7 @@ The main model comparison is Block B, the retrospective incident-information mod
 
 ### RQ1 — Random versus temporal validation
 
-For the validation-selected Block B XGBoost, random holdout PR-AUC was 0.658 (95% stratified bootstrap CI 0.646–0.669) and temporal holdout PR-AUC was 0.642 (0.631–0.653). The random-minus-temporal point difference was +0.016, with a 95% conditional independent bootstrap interval of -0.001 to +0.031. Random and temporal holdouts are different samples, so this is not a paired bootstrap. The interval included zero, so the +0.016 point difference was not clearly larger than test-sample resampling variation; evidence is insufficient to claim more than a possible modest overestimation in this fixed comparison.
+For the validation-selected Block B XGBoost, random holdout PR-AUC was 0.658 (95% stratified bootstrap CI 0.646–0.669) and temporal holdout PR-AUC was 0.642 (0.631–0.653). The random-minus-temporal point difference was +0.016, with a 95% approximate-independent bootstrap interval of -0.001 to +0.031. The holdouts overlap by 3,252 records, 12.6% of the random test set and 12.6% of the temporal test set, calculated by `SOURCE_ROW_ID` and cross-checked against cohort index. They are therefore neither paired nor fully independent. The bootstrap resamples the two holdouts separately as an approximation and does not explicitly model covariance induced by this overlap. The interval included zero, so the +0.016 point difference was not clearly larger than test-sample resampling variation; evidence is insufficient to claim more than a possible modest overestimation in this fixed comparison.
 
 These intervals condition on the fixed splits, fitted models and selected hyperparameters. They represent test-sample uncertainty only and do not include variability from retraining or repeating model and hyperparameter selection.
 
@@ -47,7 +47,7 @@ XGBoost had the highest temporal Block B PR-AUC (0.642), followed by Random Fore
 
 Grouped permutation of each original Block B field on the exact 2022/23–2023/24 temporal test set gave the following five largest mean PR-AUC decreases:
 
-| feature | mean_pr_auc_decrease | std_pr_auc_decrease | ci_lower_95 | ci_upper_95 |
+| feature | mean_pr_auc_decrease | std_pr_auc_decrease | permutation_p02_5 | permutation_p97_5 |
 |---|---|---|---|---|
 | BUILDING_TYPE | 0.109 | 0.003 | 0.103 | 0.114 |
 | ITEM_IGNITED | 0.034 | 0.003 | 0.027 | 0.041 |
@@ -55,7 +55,7 @@ Grouped permutation of each original Block B field on the exact 2022/23–2023/2
 | FIRE_START_LOCATION | 0.026 | 0.002 | 0.023 | 0.029 |
 | IGNITION_TO_DISCOVERY | 0.022 | 0.002 | 0.018 | 0.025 |
 
-This analysis measures the fitted model's dependence on each recorded field, not a causal effect. High importance does not mean that a variable causes greater fire spread. Correlated or overlapping fields can share importance; in particular, `CAUSE_OF_FIRE`, `SOURCE_OF_IGNITION` and `ITEM_IGNITED` may encode overlapping information. Results apply only to this fitted pipeline, feature set and temporal test set, and negative values are retained rather than truncated.
+The `permutation_p02_5`–`permutation_p97_5` range is the 2.5th–97.5th percentile range across 30 random permutations; it describes permutation randomness and is not a 95% confidence interval. This analysis measures the fitted model's dependence on each recorded field, not a causal effect. High importance does not mean that a variable causes greater fire spread. Correlated or overlapping fields can share importance; in particular, `CAUSE_OF_FIRE`, `SOURCE_OF_IGNITION` and `ITEM_IGNITED` may encode overlapping information. Results apply only to this fitted pipeline, feature set and temporal test set, and negative values are retained rather than truncated.
 
 ### RQ3 — First-arrival information
 

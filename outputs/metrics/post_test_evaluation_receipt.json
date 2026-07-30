@@ -1,9 +1,9 @@
 {
   "record_type": "internal_within_run_post_test_evaluation_receipt",
-  "test_evaluated_at_utc": "2026-07-30T22:08:10.997641+00:00",
+  "test_evaluated_at_utc": "2026-07-30T22:56:39.695483+00:00",
   "test_evaluation_count_this_run": 1,
   "pre_test_config_path": "outputs/metrics/pre_test_model_config.json",
-  "pre_test_config_sha256": "e2049979d4e1d782d1e5ed737e28c188376451868dba9abea68b13920ef916d6",
+  "pre_test_config_sha256": "fdd3b98035488c4461f0b023ef50b99cb0e78f0adf8e2aece55794b914e290a8",
   "runtime_environment_path": "outputs/metrics/runtime_environment.json",
   "runtime_environment": {
     "python": "3.12.13",

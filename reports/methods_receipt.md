@@ -46,22 +46,23 @@
 
 Model configurations and thresholds were programmatically recorded before holdout evaluation within each analysis run. This is an internal procedural safeguard, not an externally timestamped preregistration.
 
-- Pre-test record: `outputs/metrics/pre_test_model_config.json` (`internal_within_run_pre_test_configuration`), generated 2026-07-30T22:02:46.907838+00:00.
-- Post-test record: `outputs/metrics/post_test_evaluation_receipt.json` (`internal_within_run_post_test_evaluation_receipt`), generated 2026-07-30T22:08:10.997641+00:00.
-- The post-test record references pre-test SHA-256 `e2049979d4e1d782d1e5ed737e28c188376451868dba9abea68b13920ef916d6`. These files provide an auditable within-run order record; they do not independently verify researcher history outside the run.
+- Pre-test record: `outputs/metrics/pre_test_model_config.json` (`internal_within_run_pre_test_configuration`), generated 2026-07-30T22:50:52.696824+00:00.
+- Post-test record: `outputs/metrics/post_test_evaluation_receipt.json` (`internal_within_run_post_test_evaluation_receipt`), generated 2026-07-30T22:56:39.695483+00:00.
+- The post-test record references pre-test SHA-256 `fdd3b98035488c4461f0b023ef50b99cb0e78f0adf8e2aece55794b914e290a8`. These files provide an auditable within-run order record; they do not independently verify researcher history outside the run.
 
 ## Hyperparameters and thresholds
 
 - Full candidate ranges and results: `reports/hyperparameter_plan.md` and `outputs/tables/hyperparameter_search_results.csv`.
 - Selected parameters: `{"temporal": {"logistic_regression": {"C": 0.1}, "random_forest": {"n_estimators": 200, "max_depth": null, "min_samples_leaf": 5, "max_features": "sqrt"}, "xgboost": {"n_estimators": 200, "learning_rate": 0.1, "max_depth": 6, "min_child_weight": 5, "subsample": 0.8, "colsample_bytree": 0.8}}, "random": {"logistic_regression": {"C": 1.0}, "random_forest": {"n_estimators": 200, "max_depth": null, "min_samples_leaf": 5, "max_features": "sqrt"}, "xgboost": {"n_estimators": 200, "learning_rate": 0.1, "max_depth": 6, "min_child_weight": 5, "subsample": 0.8, "colsample_bytree": 0.8}}}`
 - Validation-selected family by block: `{"temporal": {"A": "xgboost", "B": "xgboost", "C": "xgboost"}, "random": {"A": "xgboost", "B": "xgboost", "C": "xgboost"}}`
-- Locked thresholds: `{"temporal": {"A": {"dummy": 0.2499106767878746, "logistic_regression": 0.2867622375488281, "random_forest": 0.2722170425235016, "xgboost": 0.33036476373672485}, "B": {"dummy": 0.2499106767878746, "logistic_regression": 0.2742215096950531, "random_forest": 0.3519588449756025, "xgboost": 0.2836891710758209}, "C": {"dummy": 0.2499106767878746, "logistic_regression": 0.5661454796791077, "random_forest": 0.43073410883714935, "xgboost": 0.3571653366088867}}, "random": {"A": {"dummy": 0.25722577773877503, "logistic_regression": 0.272072970867157, "random_forest": 0.29698505349039045, "xgboost": 0.29469117522239685}, "B": {"dummy": 0.25722577773877503, "logistic_regression": 0.30903926491737366, "random_forest": 0.3399175365666454, "xgboost": 0.34557846188545227}, "C": {"dummy": 0.25722577773877503, "logistic_regression": 0.4314391613006592, "random_forest": 0.4773128881043004, "xgboost": 0.5401079654693604}}}`
+- Locked thresholds: `{"temporal": {"A": {"dummy": 0.2499106767878746, "logistic_regression": 0.2867622375488281, "random_forest": 0.2722170425235016, "xgboost": 0.33036476373672485}, "B": {"dummy": 0.2499106767878746, "logistic_regression": 0.2742215096950531, "random_forest": 0.3519588449756026, "xgboost": 0.2836891710758209}, "C": {"dummy": 0.2499106767878746, "logistic_regression": 0.5661454796791077, "random_forest": 0.4307341088371494, "xgboost": 0.3571653366088867}}, "random": {"A": {"dummy": 0.25722577773877503, "logistic_regression": 0.272072970867157, "random_forest": 0.29698505349039045, "xgboost": 0.29469117522239685}, "B": {"dummy": 0.25722577773877503, "logistic_regression": 0.30903926491737366, "random_forest": 0.3399175365666454, "xgboost": 0.34557846188545227}, "C": {"dummy": 0.25722577773877503, "logistic_regression": 0.4314391613006592, "random_forest": 0.4773128881043004, "xgboost": 0.5401079654693604}}}`
 - XGBoost device: `cuda`; tree method: `hist`.
 
 ## Fixed-model uncertainty and prevalence context
 
 - PR-AUC intervals use 2,000 stratified bootstrap repeats with seed 20260811; positives and negatives are resampled separately with replacement so both class counts remain fixed.
-- The random-minus-temporal contrast independently resamples the two non-matched holdouts in each iteration and is a conditional independent bootstrap comparison, not a paired bootstrap.
+- Random and temporal test sets overlap by 3,252 records (12.597815% of random test and 12.597815% of temporal test), based on `SOURCE_ROW_ID` and cross-checked against cohort index.
+- The random-minus-temporal contrast separately resamples these partially overlapping holdouts as an approximate-independent comparison. It is not a paired bootstrap, the holdouts are not fully independent, and covariance induced by overlapping records is not explicitly modelled.
 - Percentile limits are the 2.5th and 97.5th percentiles. They condition on fixed data splits, fitted models and selected hyperparameters; retraining and repeated model selection are outside their scope.
 - PR-AUC baseline, absolute lift and normalized PR-AUC are prevalence-context diagnostics. Normalized PR-AUC is auxiliary and does not replace the primary PR-AUC definition.
 
@@ -70,7 +71,8 @@ Model configurations and thresholds were programmatically recorded before holdou
 - The validation-selected Temporal Block B XGBoost pipeline is evaluated on the exact saved 2022/23–2023/24 test indices.
 - Each of the 16 original Block B fields is permuted as a whole before the complete fitted preprocessing-and-model pipeline. This automatically groups all one-hot columns derived from that field.
 - Each field uses 30 repeats with seed 20260821; importance is baseline PR-AUC minus permuted PR-AUC, with negative values retained.
-- The reported percentile interval describes variation across permutations. Importance measures model dependence, not a causal effect, and may be shared across correlated or overlapping fields.
+- `permutation_p02_5` and `permutation_p97_5` are the 2.5th and 97.5th percentiles across random permutations. They describe permutation variability and are not confidence-interval limits.
+- Importance measures model dependence, not a causal effect, and may be shared across correlated or overlapping fields.
 
 ## Software
 

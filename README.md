@@ -79,8 +79,8 @@ python -m pytest -q
 - `reports/hyperparameter_plan.md`: post-baseline, pre-test compact search plan.
 - `reports/final_analysis_report.md`: results organised around RQ1–RQ3.
 - `reports/methods_receipt.md`: exact source, cohort, target, features, split, parameters, thresholds, uncertainty/interpretability settings, seeds, software and manifest.
-- `outputs/tables/bootstrap_confidence_intervals.csv`: stratified fixed-model PR-AUC intervals and the conditional independent random-minus-temporal comparison.
-- `outputs/tables/grouped_permutation_importance.csv`: original-field Temporal Block B model-dependence estimates.
+- `outputs/tables/bootstrap_confidence_intervals.csv`: stratified fixed-model PR-AUC intervals, test-set overlap counts and the approximate-independent random-minus-temporal comparison, which does not model overlap covariance.
+- `outputs/tables/grouped_permutation_importance.csv`: original-field Temporal Block B model-dependence estimates; percentile columns describe random-permutation variability, not confidence intervals.
 - `outputs/tables/pr_auc_prevalence_context.csv`: PR-AUC baseline, absolute lift and auxiliary normalized PR-AUC alongside ROC-AUC and Brier score.
 - `outputs/tables/`: all requested audit, performance, stability, subgroup and sensitivity tables.
 - `outputs/figures/`: ten figures in both PNG and PDF.

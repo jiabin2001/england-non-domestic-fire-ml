@@ -165,7 +165,7 @@ def _bootstrap_figure() -> None:
     axes[1].axvline(0, color="#666666", linestyle="--", linewidth=1)
     axes[1].set_yticks([0], ["Random − temporal"])
     axes[1].set_xlabel("PR-AUC difference")
-    axes[1].set_title("Independent holdout comparison")
+    axes[1].set_title("Approximate-independent holdout comparison")
     _save(fig, "09_bootstrap_pr_auc_ci")
 
 
@@ -182,7 +182,7 @@ def _grouped_permutation_figure() -> None:
         error_kw={"elinewidth": 0.8, "capsize": 2},
     )
     ax.axvline(0, color="#555555", linewidth=0.9)
-    ax.set_xlabel("Mean decrease in temporal test PR-AUC")
+    ax.set_xlabel("Mean PR-AUC decrease (error bars: permutation SD)")
     ax.set_title("Grouped permutation importance: model dependence, not causal effect")
     _save(fig, "10_grouped_permutation_importance")
 
@@ -225,7 +225,7 @@ def _write_final_report() -> None:
     rq3_gain = selected_temporal.loc["C", "pr_auc"] - selected_temporal.loc["B", "pr_auc"]
     if difference_ci.ci_lower_95 > 0:
         difference_interpretation = (
-            "The conditional independent bootstrap interval remained above zero. "
+            "The approximate-independent bootstrap interval remained above zero. "
             "Together with the small absolute point difference, this supports describing "
             "random splitting as a modest overestimation in this fixed comparison, not as "
             "a large or universal bias."
@@ -237,7 +237,7 @@ def _write_final_report() -> None:
         )
     else:
         difference_interpretation = (
-            "The interval included zero, so the +0.016 point difference was not clearly larger "
+            f"The interval included zero, so the {difference_ci.point_estimate:+.3f} point difference was not clearly larger "
             "than test-sample resampling variation; evidence is insufficient to claim more than "
             "a possible modest overestimation in this fixed comparison."
         )
@@ -267,7 +267,7 @@ The main model comparison is Block B, the retrospective incident-information mod
 
 ### RQ1 — Random versus temporal validation
 
-For the validation-selected Block B XGBoost, random holdout PR-AUC was {random_core.pr_auc:.3f} (95% stratified bootstrap CI {random_ci.ci_lower_95:.3f}–{random_ci.ci_upper_95:.3f}) and temporal holdout PR-AUC was {temporal_core.pr_auc:.3f} ({temporal_ci.ci_lower_95:.3f}–{temporal_ci.ci_upper_95:.3f}). The random-minus-temporal point difference was {difference_ci.point_estimate:+.3f}, with a 95% conditional independent bootstrap interval of {difference_ci.ci_lower_95:+.3f} to {difference_ci.ci_upper_95:+.3f}. Random and temporal holdouts are different samples, so this is not a paired bootstrap. {difference_interpretation}
+For the validation-selected Block B XGBoost, random holdout PR-AUC was {random_core.pr_auc:.3f} (95% stratified bootstrap CI {random_ci.ci_lower_95:.3f}–{random_ci.ci_upper_95:.3f}) and temporal holdout PR-AUC was {temporal_core.pr_auc:.3f} ({temporal_ci.ci_lower_95:.3f}–{temporal_ci.ci_upper_95:.3f}). The random-minus-temporal point difference was {difference_ci.point_estimate:+.3f}, with a 95% approximate-independent bootstrap interval of {difference_ci.ci_lower_95:+.3f} to {difference_ci.ci_upper_95:+.3f}. The holdouts overlap by {int(difference_ci.overlap_n):,} records, {difference_ci.overlap_fraction_random_test:.1%} of the random test set and {difference_ci.overlap_fraction_temporal_test:.1%} of the temporal test set, calculated by `SOURCE_ROW_ID` and cross-checked against cohort index. They are therefore neither paired nor fully independent. The bootstrap resamples the two holdouts separately as an approximation and does not explicitly model covariance induced by this overlap. {difference_interpretation}
 
 These intervals condition on the fixed splits, fitted models and selected hyperparameters. They represent test-sample uncertainty only and do not include variability from retraining or repeating model and hyperparameter selection.
 
@@ -283,9 +283,9 @@ XGBoost had the highest temporal Block B PR-AUC ({temporal_core.pr_auc:.3f}), fo
 
 Grouped permutation of each original Block B field on the exact 2022/23–2023/24 temporal test set gave the following five largest mean PR-AUC decreases:
 
-{_format_rows(importance_top, ['feature','mean_pr_auc_decrease','std_pr_auc_decrease','ci_lower_95','ci_upper_95'])}
+{_format_rows(importance_top, ['feature','mean_pr_auc_decrease','std_pr_auc_decrease','permutation_p02_5','permutation_p97_5'])}
 
-This analysis measures the fitted model's dependence on each recorded field, not a causal effect. High importance does not mean that a variable causes greater fire spread. Correlated or overlapping fields can share importance; in particular, `CAUSE_OF_FIRE`, `SOURCE_OF_IGNITION` and `ITEM_IGNITED` may encode overlapping information. Results apply only to this fitted pipeline, feature set and temporal test set, and negative values are retained rather than truncated.
+The `permutation_p02_5`–`permutation_p97_5` range is the 2.5th–97.5th percentile range across 30 random permutations; it describes permutation randomness and is not a 95% confidence interval. This analysis measures the fitted model's dependence on each recorded field, not a causal effect. High importance does not mean that a variable causes greater fire spread. Correlated or overlapping fields can share importance; in particular, `CAUSE_OF_FIRE`, `SOURCE_OF_IGNITION` and `ITEM_IGNITED` may encode overlapping information. Results apply only to this fitted pipeline, feature set and temporal test set, and negative values are retained rather than truncated.
 
 ### RQ3 — First-arrival information
 
@@ -324,6 +324,8 @@ def _write_methods_receipt() -> None:
     pre_test = json.loads((ROOT / "outputs/metrics/pre_test_model_config.json").read_text(encoding="utf-8"))
     post_test = json.loads((ROOT / "outputs/metrics/post_test_evaluation_receipt.json").read_text(encoding="utf-8"))
     runtime = json.loads((ROOT / "outputs/metrics/runtime_environment.json").read_text(encoding="utf-8"))
+    bootstrap = pd.read_csv(ROOT / "outputs/tables/bootstrap_confidence_intervals.csv")
+    overlap = bootstrap[bootstrap.design == "random-minus-temporal"].iloc[0]
     policy = load_yaml("config/feature_policy.yaml")
     manifest = sorted(set([
         str(path.relative_to(ROOT)).replace("\\", "/")
@@ -393,7 +395,8 @@ Model configurations and thresholds were programmatically recorded before holdou
 ## Fixed-model uncertainty and prevalence context
 
 - PR-AUC intervals use {cfg['bootstrap_repeats']:,} stratified bootstrap repeats with seed {cfg['bootstrap_seed']}; positives and negatives are resampled separately with replacement so both class counts remain fixed.
-- The random-minus-temporal contrast independently resamples the two non-matched holdouts in each iteration and is a conditional independent bootstrap comparison, not a paired bootstrap.
+- Random and temporal test sets overlap by {int(overlap.overlap_n):,} records ({overlap.overlap_fraction_random_test:.6%} of random test and {overlap.overlap_fraction_temporal_test:.6%} of temporal test), based on `SOURCE_ROW_ID` and cross-checked against cohort index.
+- The random-minus-temporal contrast separately resamples these partially overlapping holdouts as an approximate-independent comparison. It is not a paired bootstrap, the holdouts are not fully independent, and covariance induced by overlapping records is not explicitly modelled.
 - Percentile limits are the 2.5th and 97.5th percentiles. They condition on fixed data splits, fitted models and selected hyperparameters; retraining and repeated model selection are outside their scope.
 - PR-AUC baseline, absolute lift and normalized PR-AUC are prevalence-context diagnostics. Normalized PR-AUC is auxiliary and does not replace the primary PR-AUC definition.
 
@@ -402,7 +405,8 @@ Model configurations and thresholds were programmatically recorded before holdou
 - The validation-selected Temporal Block B XGBoost pipeline is evaluated on the exact saved 2022/23–2023/24 test indices.
 - Each of the 16 original Block B fields is permuted as a whole before the complete fitted preprocessing-and-model pipeline. This automatically groups all one-hot columns derived from that field.
 - Each field uses {cfg['permutation_repeats']} repeats with seed {cfg['permutation_seed']}; importance is baseline PR-AUC minus permuted PR-AUC, with negative values retained.
-- The reported percentile interval describes variation across permutations. Importance measures model dependence, not a causal effect, and may be shared across correlated or overlapping fields.
+- `permutation_p02_5` and `permutation_p97_5` are the 2.5th and 97.5th percentiles across random permutations. They describe permutation variability and are not confidence-interval limits.
+- Importance measures model dependence, not a causal effect, and may be shared across correlated or overlapping fields.
 
 ## Software
 
