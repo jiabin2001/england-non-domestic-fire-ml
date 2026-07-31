@@ -164,7 +164,7 @@ def write_hyperparameter_plan(baseline: pd.DataFrame, grid: dict[str, list[dict[
 
 Candidate configurations are deliberately compact and are selected only by validation-set average precision, calculated with scikit-learn's `average_precision_score`. Holdout performance does not alter the candidate set. The selected configuration is a practical comparison setting, not a claim of theoretical optimality.
 
-XGBoost runtime device: `{device}` (`hist` tree method). CUDA is used only when `nvidia-smi` confirms an available GPU; otherwise execution falls back to CPU.
+XGBoost runtime device: `{device}` (`hist` tree method). An explicit `cuda` configuration fails fast unless `nvidia-smi` confirms an available NVIDIA GPU; automatic CPU selection occurs only when `xgboost_device=auto`.
 
 ## Baseline observations
 
