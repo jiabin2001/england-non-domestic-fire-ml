@@ -1,0 +1,2 @@
+split_count,estimator_seed,temporal_ap_reference,random_ap_median,random_ap_q1,random_ap_q3,random_ap_min,random_ap_max,ap_difference_median,ap_difference_q1,ap_difference_q3,ap_difference_min,ap_difference_max,positive_difference_count,positive_difference_fraction
+20,20260801,0.640199883921481,0.653869422581562,0.6494205354298973,0.6570939322849192,0.6390644230384345,0.6683114859690941,0.013669538660081082,0.009220651508416333,0.01689404836343822,-0.0011354608830465018,0.028111602047613093,19,0.95

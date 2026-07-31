@@ -52,6 +52,14 @@ def test_required_output_table_schemas():
             "absolute_lift_difference", "normalized_ap_difference",
             "roc_auc_difference",
         },
+        "random_seed_stability_summary.csv": {
+            "split_count", "estimator_seed", "temporal_ap_reference",
+            "random_ap_median", "random_ap_q1", "random_ap_q3",
+            "random_ap_min", "random_ap_max", "ap_difference_median",
+            "ap_difference_q1", "ap_difference_q3", "ap_difference_min",
+            "ap_difference_max", "positive_difference_count",
+            "positive_difference_fraction",
+        },
     }
     for name, expected in schemas.items():
         assert expected.issubset(pd.read_csv(ROOT / "outputs/tables" / name).columns), name
@@ -93,6 +101,7 @@ def test_new_outputs_are_nonempty_and_manifested():
         "outputs/tables/grouped_permutation_importance.csv",
         "outputs/tables/pr_auc_prevalence_context.csv",
         "outputs/tables/cross_block_split_difference.csv",
+        "outputs/tables/random_seed_stability_summary.csv",
         "outputs/figures/09_bootstrap_pr_auc_ci.png",
         "outputs/figures/09_bootstrap_pr_auc_ci.pdf",
         "outputs/figures/10_grouped_permutation_importance.png",
@@ -151,9 +160,32 @@ def test_bootstrap_run_settings_and_method():
 def test_random_stability_varies_split_seed_only():
     cfg = load_yaml("config/analysis.yaml")
     stability = pd.read_csv(ROOT / "outputs/tables/random_seed_stability.csv")
-    assert set(stability["split_seed"]) == set(cfg["random_stability_seeds"])
+    assert len(cfg["random_stability_seeds"]) == 20
+    assert stability["split_seed"].is_unique
+    assert stability["split_seed"].tolist() == cfg["random_stability_seeds"]
     assert stability["estimator_seed"].nunique() == 1
     assert int(stability["estimator_seed"].iloc[0]) == cfg["random_seed"]
+
+
+def test_random_stability_summary_matches_seed_level_receipt():
+    stability = pd.read_csv(ROOT / "outputs/tables/random_seed_stability.csv")
+    summary = pd.read_csv(ROOT / "outputs/tables/random_seed_stability_summary.csv").iloc[0]
+    selection = json.loads(
+        (ROOT / "outputs/metrics/model_selection.json").read_text(encoding="utf-8")
+    )
+    family = selection["selected_family_by_block"]["temporal"]["B"]
+    temporal = pd.read_csv(ROOT / "outputs/tables/temporal_validation_performance.csv")
+    temporal_ap = temporal[(temporal.block == "B") & (temporal.model == family)].iloc[0].pr_auc
+    differences = stability["pr_auc"] - temporal_ap
+    assert int(summary.split_count) == len(stability)
+    assert np.isclose(summary.temporal_ap_reference, temporal_ap, rtol=0, atol=1e-12)
+    assert np.isclose(summary.random_ap_median, stability["pr_auc"].median())
+    assert np.isclose(summary.random_ap_q1, stability["pr_auc"].quantile(0.25))
+    assert np.isclose(summary.random_ap_q3, stability["pr_auc"].quantile(0.75))
+    assert np.isclose(summary.ap_difference_median, differences.median())
+    assert np.isclose(summary.ap_difference_q1, differences.quantile(0.25))
+    assert np.isclose(summary.ap_difference_q3, differences.quantile(0.75))
+    assert int(summary.positive_difference_count) == int(differences.gt(0).sum())
 
 
 def test_grouped_importance_uses_every_block_b_field_and_saved_baseline(cohort):

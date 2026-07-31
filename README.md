@@ -70,6 +70,15 @@ python scripts/06_build_report.py
 
 `06_build_report.py` is an end-to-end orchestrator, so running it after the preceding five scripts repeats the analysis. Use either the single-command route or the staged route.
 
+To extend only the configured random split-assignment sensitivity analysis, without rerunning core model selection or the fixed-model bootstrap, use:
+
+```powershell
+python scripts/05_run_random_split_stability.py
+python -c "from fireml.reporting import build_report; build_report()"
+```
+
+The targeted stability script recomputes all configured split seeds but skips the other robustness analyses, core model selection and fixed-model bootstrap.
+
 Run tests with:
 
 ```powershell
@@ -85,6 +94,8 @@ python -m pytest -q
 - `outputs/tables/bootstrap_confidence_intervals.csv`: 100,000-repeat partially paired fixed-model AP intervals; shared holdout records are resampled jointly so the observed overlap covariance is represented.
 - `outputs/tables/grouped_permutation_importance.csv`: original-field Temporal Block B model-dependence estimates, summarised by mean AP decrease and permutation sample SD. Thirty repeats are not used to infer tail percentiles.
 - `outputs/tables/pr_auc_prevalence_context.csv`: AP baseline, absolute lift and auxiliary normalized AP alongside ROC-AUC and Brier score. The legacy filename is retained for compatibility.
+- `outputs/tables/random_seed_stability.csv`: seed-level results for 20 random split assignments with estimator seed and selected hyperparameters fixed.
+- `outputs/tables/random_seed_stability_summary.csv`: median, IQR, range and sign-count receipt for the split-assignment AP sensitivity analysis.
 - `outputs/tables/`: all requested audit, performance, stability, subgroup and sensitivity tables.
 - `outputs/figures/`: ten figures in both PNG and PDF.
 - `outputs/models/`: validation-selected fitted pipelines.

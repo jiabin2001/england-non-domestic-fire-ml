@@ -36,7 +36,7 @@ For the validation-selected Block B XGBoost, random holdout AP was 0.657 (95% bo
 
 These intervals condition on the fixed splits, fitted models and selected settings. They represent test-sample uncertainty and the observed overlap covariance, but not variability from repeating the full selection procedure.
 
-All three Block B model families favoured random splitting in AP (Logistic Regression +0.011, Random Forest +0.018, XGBoost +0.016), and their ROC-AUC differences were also positive. With the estimator seed held fixed, the three random split assignments produced random-minus-temporal AP differences of +0.016, +0.018, +0.009. Together, these results support a small and directionally consistent random-split optimism effect in this retrospective Block B task. Its exact magnitude varies with the split and should not be treated as a universal or operationally important bias without a decision-specific cost analysis.
+All three Block B model families favoured random splitting in AP (Logistic Regression +0.011, Random Forest +0.018, XGBoost +0.016), and their ROC-AUC differences were also positive. With the estimator seed held fixed, 20 random split assignments produced a median random-minus-temporal AP difference of +0.014 (IQR +0.009 to +0.017; range -0.001 to +0.028); 19 of 20 differences were positive. The median supports a small typical random-split optimism effect in this retrospective Block B task, but the direction was not uniform across assignments. Its exact magnitude varies with the split and should not be treated as a universal or operationally important bias without a decision-specific cost analysis. These repeated splits form an empirical sensitivity analysis under fixed model settings, not a second bootstrap interval or 20 independent datasets.
 
 The direction is not universal across information blocks, even for the same XGBoost family:
 
@@ -103,7 +103,7 @@ Expanding-window F1, precision, recall and balanced accuracy use a fixed descrip
 | include_late_calls | 2022/23-2023/24 | 26108 | 0.263 | 0.639 | 0.375 | 0.510 | 0.840 | 0.638 |
 | include_2024_25_exclude_suffolk | 2024/25 | 12553 | 0.241 | 0.630 | 0.390 | 0.513 | 0.846 | 0.623 |
 
-Across target, cohort and new-year checks, normalized AP ranged only from 0.510 to 0.520. The roof-positive definition had higher raw AP but slightly lower absolute lift (0.371) than the main definition (0.375); it should not be read as unambiguously better performance. Across the three split assignments with a fixed estimator seed, random-holdout AP ranged from 0.650 to 0.659.
+Across target, cohort and new-year checks, normalized AP ranged only from 0.510 to 0.520. The roof-positive definition had higher raw AP but slightly lower absolute lift (0.371) than the main definition (0.375); it should not be read as unambiguously better performance. Across 20 split assignments with a fixed estimator seed, random-holdout AP had median 0.654 (IQR 0.649–0.657) and ranged from 0.639 to 0.668.
 
 Building-type subgroup AP ranged from 0.051 for Prison (prevalence 0.034) to 0.731 for Shed / Garage / Greenhouse / Summer house (0.592). At the single global validation-F1 threshold, the largest retained subgroup with zero recall was Prison, with 96 positives among 2,852 incidents. This is evidence that the global analytical threshold does not transfer uniformly across prevalence-defined subgroups; it is not evidence that building type causes fire spread or that the remaining fields lack within-group signal.
 

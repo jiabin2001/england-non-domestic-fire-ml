@@ -34,6 +34,67 @@ def _fit_validation_then_test(
     return classification_metrics(frame.loc[split["test"], "LARGER_FIRE"].to_numpy(), probability, threshold), threshold
 
 
+def _build_random_split_stability(
+    frame: pd.DataFrame,
+    temporal: dict[str, np.ndarray],
+    columns: list[str],
+    family: str,
+    parameters: dict[str, Any],
+    estimator_seed: int,
+    split_seeds: list[int],
+    n_jobs: int,
+    device: str,
+) -> pd.DataFrame:
+    configured_seeds = [int(value) for value in split_seeds]
+    if len(configured_seeds) != len(set(configured_seeds)):
+        raise ValueError("random_stability_seeds must be unique.")
+
+    output_path = ROOT / "outputs/tables/random_seed_stability.csv"
+    seed_rows = []
+    for split_seed in configured_seeds:
+        random_split = make_random_split_like(frame, temporal, split_seed)
+        metrics, _ = _fit_validation_then_test(
+            frame, random_split, columns, family, parameters,
+            estimator_seed, n_jobs, device,
+        )
+        seed_rows.append({
+            "split_seed": split_seed, "estimator_seed": estimator_seed,
+            "design": "random", "block": "B", "model": family, **metrics,
+        })
+
+    random_stability = pd.DataFrame(seed_rows)
+    random_stability.to_csv(output_path, index=False)
+    return random_stability
+
+
+def run_random_split_stability() -> pd.DataFrame:
+    """Run only the configured Block B split-assignment sensitivity analysis."""
+    cfg = load_yaml("config/analysis.yaml")
+    audit = json.loads((ROOT / "outputs/metrics/audit_receipt.json").read_text(encoding="utf-8"))
+    selection = json.loads((ROOT / "outputs/metrics/model_selection.json").read_text(encoding="utf-8"))
+    frame = pd.read_parquet(ROOT / cfg["cohort_path"])
+    columns = resolve_blocks(frame.columns)["B"]
+    family = selection["selected_family_by_block"]["temporal"]["B"]
+    estimator_seed = int(cfg["random_seed"])
+    temporal = make_temporal_split(
+        frame,
+        audit["temporal_train_years"],
+        audit["temporal_validation_years"],
+        audit["temporal_test_years"],
+    )
+    return _build_random_split_stability(
+        frame,
+        temporal,
+        columns,
+        family,
+        selection["selected_hyperparameters"]["random"][family],
+        estimator_seed,
+        cfg["random_stability_seeds"],
+        int(cfg["n_jobs"]),
+        selection["xgboost_device"],
+    )
+
+
 def run_temporal_robustness() -> dict[str, pd.DataFrame]:
     cfg = load_yaml("config/analysis.yaml")
     audit = json.loads((ROOT / "outputs/metrics/audit_receipt.json").read_text(encoding="utf-8"))
@@ -110,19 +171,17 @@ def run_temporal_robustness() -> dict[str, pd.DataFrame]:
 
     # Random-split stability check: vary only the split assignment while holding
     # the estimator seed and selected hyperparameters fixed.
-    seed_rows = []
-    for stability_seed in cfg["random_stability_seeds"]:
-        random_split = make_random_split_like(frame, temporal, int(stability_seed))
-        metrics, _ = _fit_validation_then_test(
-            frame, random_split, columns, family,
-            selection["selected_hyperparameters"]["random"][family], seed, n_jobs, device,
-        )
-        seed_rows.append({
-            "split_seed": int(stability_seed), "estimator_seed": seed,
-            "design": "random", "block": "B", "model": family, **metrics,
-        })
-    random_stability = pd.DataFrame(seed_rows)
-    random_stability.to_csv(ROOT / "outputs/tables/random_seed_stability.csv", index=False)
+    random_stability = _build_random_split_stability(
+        frame,
+        temporal,
+        columns,
+        family,
+        selection["selected_hyperparameters"]["random"][family],
+        seed,
+        cfg["random_stability_seeds"],
+        n_jobs,
+        device,
+    )
 
     build_drift_tables(frame, temporal)
     prediction = pd.read_parquet(ROOT / "outputs/metrics/predictions_temporal_block_B.parquet")

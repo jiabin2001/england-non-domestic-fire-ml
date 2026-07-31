@@ -42,7 +42,7 @@
 - Temporal validation: 2020/21, 2021/22
 - Temporal test: 2022/23, 2023/24
 - Random comparator: stratified sampling with exactly matching train/validation/test counts.
-- Primary seed: 20260801; stability seeds: [20260801, 20260802, 20260803].
+- Primary seed: 20260801; stability seeds: [20260801, 20260802, 20260803, 20260804, 20260805, 20260806, 20260807, 20260808, 20260809, 20260810, 20260811, 20260812, 20260813, 20260814, 20260815, 20260816, 20260817, 20260818, 20260819, 20260820].
 - Selection metric: validation average precision (`average_precision_score`). Threshold: validation F1 maximum, an analytical operating point rather than an operational optimum.
 - Legacy output columns and file stems named `pr_auc` store this non-interpolated AP value; no trapezoidal precision–recall curve area is calculated.
 - Threshold provenance: the selected train-fitted pipeline and its validation-derived threshold are evaluated on test without a train+validation refit or test-set retuning.
@@ -66,8 +66,13 @@
 - Shared records are resampled jointly in both holdouts; random-only and temporal-only records are resampled independently. Outcome class and observed overlap membership counts remain fixed.
 - Percentile limits are the 2.5th and 97.5th percentiles. They condition on fixed splits, fitted models and selected settings; repeated end-to-end selection is outside their scope.
 - The repeat count controls Monte Carlo error in these fixed-model percentile limits; it does not address split-assignment or model-selection uncertainty.
-- With estimator seed 20260801 fixed, split seeds [20260801, 20260802, 20260803] give random-minus-temporal AP differences of +0.016, +0.018, +0.009 (range 0.009).
 - AP baseline, absolute lift and normalized AP are prevalence-context diagnostics. Normalized AP is auxiliary and does not replace the primary AP definition.
+
+## Split-assignment stability
+
+- The 20 configured split seeds are listed in `config/analysis.yaml`; complete seed-level results are in `outputs/tables/random_seed_stability.csv`.
+- With estimator seed 20260801 and selected random-design hyperparameters fixed, the median random-minus-temporal AP difference was +0.013670 (IQR +0.009221 to +0.016894; range -0.001135 to +0.028112). Positive differences occurred for 19 of 20 assignments.
+- This is an empirical split-assignment sensitivity analysis, not a Monte Carlo bootstrap or a repetition of end-to-end family/hyperparameter selection. It does not require a second bootstrap; the separate fixed-model bootstrap remains configured at 100,000 repeats.
 
 ## Grouped permutation importance
 
@@ -170,6 +175,7 @@
 - `outputs/tables/ods_sheet_inventory.csv`
 - `outputs/tables/pr_auc_prevalence_context.csv`
 - `outputs/tables/random_seed_stability.csv`
+- `outputs/tables/random_seed_stability_summary.csv`
 - `outputs/tables/random_to_temporal_difference.csv`
 - `outputs/tables/random_validation_performance.csv`
 - `outputs/tables/sensitivity_analysis_results.csv`

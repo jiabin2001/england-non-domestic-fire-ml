@@ -276,6 +276,42 @@ def _human_join(values: list[str]) -> str:
     return f"{', '.join(values[:-1])} and {values[-1]}"
 
 
+def _summarize_random_stability(
+    stability: pd.DataFrame,
+    temporal_ap: float,
+    configured_seeds: list[int],
+    estimator_seed: int,
+) -> pd.DataFrame:
+    expected_seeds = [int(value) for value in configured_seeds]
+    observed_seeds = stability["split_seed"].astype(int).tolist()
+    if observed_seeds != expected_seeds:
+        raise ValueError(
+            "random_seed_stability.csv must contain each configured split seed once, "
+            "in configuration order."
+        )
+    if not stability["estimator_seed"].eq(estimator_seed).all():
+        raise ValueError("Random split stability rows must use the configured estimator seed.")
+
+    differences = stability["pr_auc"] - temporal_ap
+    return pd.DataFrame([{
+        "split_count": len(stability),
+        "estimator_seed": estimator_seed,
+        "temporal_ap_reference": temporal_ap,
+        "random_ap_median": stability["pr_auc"].median(),
+        "random_ap_q1": stability["pr_auc"].quantile(0.25),
+        "random_ap_q3": stability["pr_auc"].quantile(0.75),
+        "random_ap_min": stability["pr_auc"].min(),
+        "random_ap_max": stability["pr_auc"].max(),
+        "ap_difference_median": differences.median(),
+        "ap_difference_q1": differences.quantile(0.25),
+        "ap_difference_q3": differences.quantile(0.75),
+        "ap_difference_min": differences.min(),
+        "ap_difference_max": differences.max(),
+        "positive_difference_count": int(differences.gt(0).sum()),
+        "positive_difference_fraction": differences.gt(0).mean(),
+    }])
+
+
 def _write_final_report() -> None:
     cfg = load_yaml("config/analysis.yaml")
     metadata = json.loads((ROOT / "data/raw/source_metadata.json").read_text(encoding="utf-8"))
@@ -391,9 +427,40 @@ def _write_final_report() -> None:
         family_roc_direction_text = "were all negative"
     else:
         family_roc_direction_text = "were mixed in sign or included zero"
-    stability_differences = stability["pr_auc"] - float(temporal_core.pr_auc)
-    stability_difference_text = ", ".join(f"{value:+.3f}" for value in stability_differences)
-    stability_difference_range = float(stability_differences.max() - stability_differences.min())
+    stability_summary_table = _summarize_random_stability(
+        stability,
+        float(temporal_core.pr_auc),
+        cfg["random_stability_seeds"],
+        int(cfg["random_seed"]),
+    )
+    stability_summary_table.to_csv(
+        ROOT / "outputs/tables/random_seed_stability_summary.csv", index=False
+    )
+    stability_summary = stability_summary_table.iloc[0]
+    stability_count = int(stability_summary.split_count)
+    stability_positive_count = int(stability_summary.positive_difference_count)
+    if stability_positive_count == stability_count:
+        stability_direction_text = f"all {stability_count} differences were positive"
+        stability_interpretation = (
+            "Together, these results support a small and directionally consistent random-split "
+            "optimism effect in this retrospective Block B task."
+        )
+    elif stability_positive_count > stability_count / 2:
+        stability_direction_text = (
+            f"{stability_positive_count} of {stability_count} differences were positive"
+        )
+        stability_interpretation = (
+            "The median supports a small typical random-split optimism effect in this retrospective "
+            "Block B task, but the direction was not uniform across assignments."
+        )
+    else:
+        stability_direction_text = (
+            f"{stability_positive_count} of {stability_count} differences were positive"
+        )
+        stability_interpretation = (
+            "The repeated assignments do not support a directionally consistent random-split "
+            "optimism effect in this retrospective Block B task."
+        )
     cross_block_rows = []
     for block_name in ("A", "B", "C"):
         random_row = random[(random.block == block_name) & (random.model == core_family)].iloc[0]
@@ -499,7 +566,7 @@ For the validation-selected Block B XGBoost, random holdout AP was {random_core.
 
 These intervals condition on the fixed splits, fitted models and selected settings. They represent test-sample uncertainty and the observed overlap covariance, but not variability from repeating the full selection procedure.
 
-{family_ap_direction_text} ({family_difference_text}), and their ROC-AUC differences {family_roc_direction_text}. With the estimator seed held fixed, the three random split assignments produced random-minus-temporal AP differences of {stability_difference_text}. Together, these results support a small and directionally consistent random-split optimism effect in this retrospective Block B task. Its exact magnitude varies with the split and should not be treated as a universal or operationally important bias without a decision-specific cost analysis.
+{family_ap_direction_text} ({family_difference_text}), and their ROC-AUC differences {family_roc_direction_text}. With the estimator seed held fixed, {stability_count} random split assignments produced a median random-minus-temporal AP difference of {stability_summary.ap_difference_median:+.3f} (IQR {stability_summary.ap_difference_q1:+.3f} to {stability_summary.ap_difference_q3:+.3f}; range {stability_summary.ap_difference_min:+.3f} to {stability_summary.ap_difference_max:+.3f}); {stability_direction_text}. {stability_interpretation} Its exact magnitude varies with the split and should not be treated as a universal or operationally important bias without a decision-specific cost analysis. These repeated splits form an empirical sensitivity analysis under fixed model settings, not a second bootstrap interval or {stability_count} independent datasets.
 
 The direction is not universal across information blocks, even for the same XGBoost family:
 
@@ -543,7 +610,7 @@ Expanding-window F1, precision, recall and balanced accuracy use a fixed descrip
 
 {_format_rows(sensitivity_context[['analysis','test_period','n','positive_prevalence','pr_auc','ap_absolute_lift','normalized_ap','roc_auc','f1']].rename(columns={'pr_auc': 'average_precision'}), ['analysis','test_period','n','positive_prevalence','average_precision','ap_absolute_lift','normalized_ap','roc_auc','f1'])}
 
-Across target, cohort and new-year checks, normalized AP ranged only from {sensitivity_context.normalized_ap.min():.3f} to {sensitivity_context.normalized_ap.max():.3f}. The roof-positive definition had higher raw AP but slightly lower absolute lift ({sensitivity_context.loc[sensitivity_context.analysis == 'roofs_roof_spaces_positive','ap_absolute_lift'].iloc[0]:.3f}) than the main definition ({sensitivity_context.loc[sensitivity_context.analysis == 'main_temporal_definition','ap_absolute_lift'].iloc[0]:.3f}); it should not be read as unambiguously better performance. Across the three split assignments with a fixed estimator seed, random-holdout AP ranged from {stability.pr_auc.min():.3f} to {stability.pr_auc.max():.3f}.
+Across target, cohort and new-year checks, normalized AP ranged only from {sensitivity_context.normalized_ap.min():.3f} to {sensitivity_context.normalized_ap.max():.3f}. The roof-positive definition had higher raw AP but slightly lower absolute lift ({sensitivity_context.loc[sensitivity_context.analysis == 'roofs_roof_spaces_positive','ap_absolute_lift'].iloc[0]:.3f}) than the main definition ({sensitivity_context.loc[sensitivity_context.analysis == 'main_temporal_definition','ap_absolute_lift'].iloc[0]:.3f}); it should not be read as unambiguously better performance. Across {stability_count} split assignments with a fixed estimator seed, random-holdout AP had median {stability_summary.random_ap_median:.3f} (IQR {stability_summary.random_ap_q1:.3f}–{stability_summary.random_ap_q3:.3f}) and ranged from {stability_summary.random_ap_min:.3f} to {stability_summary.random_ap_max:.3f}.
 
 Building-type subgroup AP ranged from {subgroup_low.pr_auc:.3f} for {subgroup_low.building_type} (prevalence {subgroup_low.positive_prevalence:.3f}) to {subgroup_high.pr_auc:.3f} for {subgroup_high.building_type} ({subgroup_high.positive_prevalence:.3f}). {subgroup_threshold_text} This is evidence that the global analytical threshold does not transfer uniformly across prevalence-defined subgroups; it is not evidence that building type causes fire spread or that the remaining fields lack within-group signal.
 
@@ -583,8 +650,16 @@ def _write_methods_receipt() -> None:
     temporal_point = bootstrap[
         (bootstrap.estimand == "average precision") & (bootstrap.design == "temporal")
     ].iloc[0].point_estimate
-    stability_differences = stability["pr_auc"] - temporal_point
-    stability_difference_range = stability_differences.max() - stability_differences.min()
+    stability_summary_table = _summarize_random_stability(
+        stability,
+        float(temporal_point),
+        cfg["random_stability_seeds"],
+        int(cfg["random_seed"]),
+    )
+    stability_summary_table.to_csv(
+        ROOT / "outputs/tables/random_seed_stability_summary.csv", index=False
+    )
+    stability_summary = stability_summary_table.iloc[0]
     policy = load_yaml("config/feature_policy.yaml")
     shared_configuration_families = [
         family for family in ("logistic_regression", "random_forest", "xgboost")
@@ -672,8 +747,13 @@ def _write_methods_receipt() -> None:
 - Shared records are resampled jointly in both holdouts; random-only and temporal-only records are resampled independently. Outcome class and observed overlap membership counts remain fixed.
 - Percentile limits are the 2.5th and 97.5th percentiles. They condition on fixed splits, fitted models and selected settings; repeated end-to-end selection is outside their scope.
 - The repeat count controls Monte Carlo error in these fixed-model percentile limits; it does not address split-assignment or model-selection uncertainty.
-- With estimator seed {cfg['random_seed']} fixed, split seeds {cfg['random_stability_seeds']} give random-minus-temporal AP differences of {', '.join(f'{value:+.3f}' for value in stability_differences)} (range {stability_difference_range:.3f}).
 - AP baseline, absolute lift and normalized AP are prevalence-context diagnostics. Normalized AP is auxiliary and does not replace the primary AP definition.
+
+## Split-assignment stability
+
+- The {int(stability_summary.split_count)} configured split seeds are listed in `config/analysis.yaml`; complete seed-level results are in `outputs/tables/random_seed_stability.csv`.
+- With estimator seed {cfg['random_seed']} and selected random-design hyperparameters fixed, the median random-minus-temporal AP difference was {stability_summary.ap_difference_median:+.6f} (IQR {stability_summary.ap_difference_q1:+.6f} to {stability_summary.ap_difference_q3:+.6f}; range {stability_summary.ap_difference_min:+.6f} to {stability_summary.ap_difference_max:+.6f}). Positive differences occurred for {int(stability_summary.positive_difference_count)} of {int(stability_summary.split_count)} assignments.
+- This is an empirical split-assignment sensitivity analysis, not a Monte Carlo bootstrap or a repetition of end-to-end family/hyperparameter selection. It does not require a second bootstrap; the separate fixed-model bootstrap remains configured at {cfg['bootstrap_repeats']:,} repeats.
 
 ## Grouped permutation importance
 

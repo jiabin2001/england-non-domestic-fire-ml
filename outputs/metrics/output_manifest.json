@@ -62,6 +62,7 @@
   "outputs/tables/ods_sheet_inventory.csv",
   "outputs/tables/pr_auc_prevalence_context.csv",
   "outputs/tables/random_seed_stability.csv",
+  "outputs/tables/random_seed_stability_summary.csv",
   "outputs/tables/random_to_temporal_difference.csv",
   "outputs/tables/random_validation_performance.csv",
   "outputs/tables/sensitivity_analysis_results.csv",
