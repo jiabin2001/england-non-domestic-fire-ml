@@ -47,6 +47,11 @@ def test_required_output_table_schemas():
             "pr_auc_baseline", "pr_auc_absolute_lift", "normalized_pr_auc",
             "roc_auc", "brier_score",
         },
+        "cross_block_split_difference.csv": {
+            "block", "random_ap", "temporal_ap", "ap_difference",
+            "absolute_lift_difference", "normalized_ap_difference",
+            "roc_auc_difference",
+        },
     }
     for name, expected in schemas.items():
         assert expected.issubset(pd.read_csv(ROOT / "outputs/tables" / name).columns), name
@@ -87,6 +92,7 @@ def test_new_outputs_are_nonempty_and_manifested():
         "outputs/tables/bootstrap_confidence_intervals.csv",
         "outputs/tables/grouped_permutation_importance.csv",
         "outputs/tables/pr_auc_prevalence_context.csv",
+        "outputs/tables/cross_block_split_difference.csv",
         "outputs/figures/09_bootstrap_pr_auc_ci.png",
         "outputs/figures/09_bootstrap_pr_auc_ci.pdf",
         "outputs/figures/10_grouped_permutation_importance.png",

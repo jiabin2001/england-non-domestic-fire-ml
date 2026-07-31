@@ -18,7 +18,7 @@ The main target follows the unambiguous room→floor→whole-building ordering a
 
 Temporal train/validation/test years are 2010/11–2019/20, 2020/21–2021/22 and 2022/23–2023/24. The stratified random comparator has exactly the same 159,533/23,824/25,814 sample sizes. All imputing and encoding were pipeline-fitted on training data only. Compact hyperparameter and family selection used validation average precision (AP), calculated with scikit-learn's non-interpolated `average_precision_score`; analytical classification thresholds maximised validation F1. The selected train-fitted pipeline and its validation-derived threshold were then evaluated once on the corresponding holdout, with no train+validation refit or test-set retuning.
 
-Random Forest and XGBoost selected identical hyperparameters under random and temporal development designs. In particular, the primary XGBoost RQ1 contrast is not confounded by comparing different XGBoost configurations; Logistic Regression selected different regularisation strengths (`C=1.0` random versus `C=0.1` temporal).
+Random Forest and XGBoost selected identical hyperparameters under random and temporal development designs. Selected settings differed for Logistic Regression: random `{"C": 1.0}` versus temporal `{"C": 0.1}`. The primary XGBoost RQ1 contrast therefore uses the same selected configuration in both designs.
 
 The main model comparison is Block B, the retrospective incident-information model:
 
@@ -75,9 +75,11 @@ Grouped permutation of each original Block B field on the exact 2022/23–2023/2
 
 With only 30 permutations, the table reports the mean and sample standard deviation; empirical 2.5th and 97.5th percentiles are too coarsely resolved to interpret. This analysis measures the fitted model's dependence on each recorded field, not a causal effect. High importance does not mean that a variable causes greater fire spread. Correlated or overlapping fields can share importance; in particular, `CAUSE_OF_FIRE`, `SOURCE_OF_IGNITION` and `ITEM_IGNITED` may encode overlapping information. Results apply only to this fitted pipeline, feature set and temporal test set, and negative values are retained rather than truncated.
 
-### RQ3 — First-arrival information
+### Structural/context information
 
 On the same temporal holdout, Block A's 5 structural/context fields achieved AP 0.560, an absolute lift of 0.294 above prevalence. That is 78.5% of Block B's 0.375 lift using 16 fields. This is a descriptive nested-block comparison, not an operational-utility estimate, because some Block A fields are retrospectively recorded.
+
+### RQ3 — First-arrival information
 
 For validation-selected families, temporal AP rose from 0.640 in Block B to 0.982 in Block C, an absolute gain of 0.342. `FIRE_SIZE_ON_ARRIVAL` is temporally prior to final `SPREAD_OF_FIRE`, but it is a highly proximal state variable. The Block C result is therefore first-arrival prognosis, not pre-incident building risk and not evidence of deployability before crews arrive.
 
@@ -103,7 +105,7 @@ Expanding-window F1, precision, recall and balanced accuracy use a fixed descrip
 
 Across target, cohort and new-year checks, normalized AP ranged only from 0.510 to 0.520. The roof-positive definition had higher raw AP but slightly lower absolute lift (0.371) than the main definition (0.375); it should not be read as unambiguously better performance. Across the three split assignments with a fixed estimator seed, random-holdout AP ranged from 0.650 to 0.659.
 
-Building-type subgroup AP ranged from 0.051 for Prison (prevalence 0.034) to 0.731 for Shed / Garage / Greenhouse / Summer house (0.592). At the single global validation-F1 threshold, the Prison subgroup contained 96 positives among 2,852 incidents but received no positive predictions (recall and precision both zero). This is evidence that the global analytical threshold does not transfer uniformly across prevalence-defined subgroups; it is not evidence that building type causes fire spread or that the remaining fields lack within-group signal.
+Building-type subgroup AP ranged from 0.051 for Prison (prevalence 0.034) to 0.731 for Shed / Garage / Greenhouse / Summer house (0.592). At the single global validation-F1 threshold, the largest retained subgroup with zero recall was Prison, with 96 positives among 2,852 incidents. This is evidence that the global analytical threshold does not transfer uniformly across prevalence-defined subgroups; it is not evidence that building type causes fire spread or that the remaining fields lack within-group signal.
 
 ## Limitations
 

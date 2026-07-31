@@ -270,6 +270,12 @@ def _format_rows(frame: pd.DataFrame, columns: list[str], decimals: int = 3) -> 
     return "\n".join([header, rule, *rows])
 
 
+def _human_join(values: list[str]) -> str:
+    if len(values) < 2:
+        return "".join(values)
+    return f"{', '.join(values[:-1])} and {values[-1]}"
+
+
 def _write_final_report() -> None:
     cfg = load_yaml("config/analysis.yaml")
     metadata = json.loads((ROOT / "data/raw/source_metadata.json").read_text(encoding="utf-8"))
@@ -294,10 +300,48 @@ def _write_final_report() -> None:
         if selection["selected_hyperparameters"]["temporal"][family]
         == selection["selected_hyperparameters"]["random"][family]
     ]
-    shared_configuration_labels = [MODEL_LABELS[family] for family in shared_configuration_families]
-    shared_configuration_text = " and ".join(shared_configuration_labels)
+    differing_configuration_families = [
+        family for family in ("logistic_regression", "random_forest", "xgboost")
+        if family not in shared_configuration_families
+    ]
+    if shared_configuration_families:
+        shared_configuration_sentence = (
+            f"{_human_join([MODEL_LABELS[family] for family in shared_configuration_families])} "
+            "selected identical hyperparameters under random and temporal development designs."
+        )
+    else:
+        shared_configuration_sentence = (
+            "No model family selected identical hyperparameters under the random and temporal "
+            "development designs."
+        )
+    if differing_configuration_families:
+        differing_configuration_details = "; ".join(
+            f"{MODEL_LABELS[family]}: random "
+            f"`{json.dumps(selection['selected_hyperparameters']['random'][family], sort_keys=True)}` "
+            f"versus temporal "
+            f"`{json.dumps(selection['selected_hyperparameters']['temporal'][family], sort_keys=True)}`"
+            for family in differing_configuration_families
+        )
+        differing_configuration_sentence = (
+            f"Selected settings differed for {differing_configuration_details}."
+        )
+    else:
+        differing_configuration_sentence = "No selected settings differed between the two designs."
     main_models = temporal[(temporal.block == "B") & (temporal.model != "dummy")].sort_values("pr_auc", ascending=False)
     core_family = selection["selected_family_by_block"]["temporal"]["B"]
+    if (
+        selection["selected_hyperparameters"]["temporal"][core_family]
+        == selection["selected_hyperparameters"]["random"][core_family]
+    ):
+        core_configuration_sentence = (
+            f"The primary {MODEL_LABELS[core_family]} RQ1 contrast therefore uses the same "
+            "selected configuration in both designs."
+        )
+    else:
+        core_configuration_sentence = (
+            f"The primary {MODEL_LABELS[core_family]} RQ1 contrast uses different selected "
+            "configurations in the two designs and should be interpreted accordingly."
+        )
     temporal_core = temporal[(temporal.block == "B") & (temporal.model == core_family)].iloc[0]
     random_core = random[(random.block == "B") & (random.model == core_family)].iloc[0]
     random_ci = bootstrap[(bootstrap.estimand == "average precision") & (bootstrap.design == "random")].iloc[0]
@@ -335,6 +379,18 @@ def _write_final_report() -> None:
         f"{MODEL_LABELS[row.model]} {row.ap_difference:+.3f}"
         for row in family_comparison.itertuples(index=False)
     )
+    if family_comparison["ap_difference"].gt(0).all():
+        family_ap_direction_text = "All three Block B model families favoured random splitting in AP"
+    elif family_comparison["ap_difference"].lt(0).all():
+        family_ap_direction_text = "All three Block B model families favoured temporal splitting in AP"
+    else:
+        family_ap_direction_text = "The Block B model-family AP differences were mixed in direction"
+    if family_comparison["roc_auc_difference"].gt(0).all():
+        family_roc_direction_text = "were also positive"
+    elif family_comparison["roc_auc_difference"].lt(0).all():
+        family_roc_direction_text = "were all negative"
+    else:
+        family_roc_direction_text = "were mixed in sign or included zero"
     stability_differences = stability["pr_auc"] - float(temporal_core.pr_auc)
     stability_difference_text = ", ".join(f"{value:+.3f}" for value in stability_differences)
     stability_difference_range = float(stability_differences.max() - stability_differences.min())
@@ -355,7 +411,11 @@ def _write_final_report() -> None:
             "normalized_ap_difference": random_normalized - temporal_normalized,
             "roc_auc_difference": random_row.roc_auc - temporal_row.roc_auc,
         })
-    cross_block = pd.DataFrame(cross_block_rows).set_index("block")
+    cross_block_table = pd.DataFrame(cross_block_rows)
+    cross_block_table.to_csv(
+        ROOT / "outputs/tables/cross_block_split_difference.csv", index=False
+    )
+    cross_block = cross_block_table.set_index("block")
     block_a_lift = (
         selected_temporal.loc["A", "pr_auc"]
         - selected_temporal.loc["A", "positive_prevalence"]
@@ -389,7 +449,22 @@ def _write_final_report() -> None:
     )
     subgroup_low = subgroup.loc[subgroup.pr_auc.idxmin()]
     subgroup_high = subgroup.loc[subgroup.pr_auc.idxmax()]
-    prison = subgroup[subgroup.building_type.eq("Prison")].iloc[0]
+    zero_recall_subgroups = subgroup.loc[subgroup["recall"].eq(0)].sort_values(
+        ["n", "building_type"], ascending=[False, True]
+    )
+    if zero_recall_subgroups.empty:
+        subgroup_threshold_text = (
+            "Every retained building-type subgroup had non-zero recall at the single global "
+            "validation-F1 threshold."
+        )
+    else:
+        zero_recall_subgroup = zero_recall_subgroups.iloc[0]
+        subgroup_threshold_text = (
+            "At the single global validation-F1 threshold, the largest retained subgroup with "
+            f"zero recall was {zero_recall_subgroup.building_type}, with "
+            f"{int(zero_recall_subgroup.positive_count)} positives among "
+            f"{int(zero_recall_subgroup.n):,} incidents."
+        )
     report = f"""# Final analysis report
 
 ## Study definition
@@ -410,7 +485,7 @@ The main target follows the unambiguous room→floor→whole-building ordering a
 
 Temporal train/validation/test years are {_year_span(audit['temporal_train_years'])}, {_year_span(audit['temporal_validation_years'])} and {_year_span(audit['temporal_test_years'])}. The stratified random comparator has exactly the same {random_split_sizes} sample sizes. All imputing and encoding were pipeline-fitted on training data only. Compact hyperparameter and family selection used validation average precision (AP), calculated with scikit-learn's non-interpolated `average_precision_score`; analytical classification thresholds maximised validation F1. The selected train-fitted pipeline and its validation-derived threshold were then evaluated once on the corresponding holdout, with no train+validation refit or test-set retuning.
 
-{shared_configuration_text} selected identical hyperparameters under random and temporal development designs. In particular, the primary XGBoost RQ1 contrast is not confounded by comparing different XGBoost configurations; Logistic Regression selected different regularisation strengths (`C=1.0` random versus `C=0.1` temporal).
+{shared_configuration_sentence} {differing_configuration_sentence} {core_configuration_sentence}
 
 The main model comparison is Block B, the retrospective incident-information model:
 
@@ -424,7 +499,7 @@ For the validation-selected Block B XGBoost, random holdout AP was {random_core.
 
 These intervals condition on the fixed splits, fitted models and selected settings. They represent test-sample uncertainty and the observed overlap covariance, but not variability from repeating the full selection procedure.
 
-All three Block B model families favoured random splitting in AP ({family_difference_text}), and their ROC-AUC differences were also positive. With the estimator seed held fixed, the three random split assignments produced random-minus-temporal AP differences of {stability_difference_text}. Together, these results support a small and directionally consistent random-split optimism effect in this retrospective Block B task. Its exact magnitude varies with the split and should not be treated as a universal or operationally important bias without a decision-specific cost analysis.
+{family_ap_direction_text} ({family_difference_text}), and their ROC-AUC differences {family_roc_direction_text}. With the estimator seed held fixed, the three random split assignments produced random-minus-temporal AP differences of {stability_difference_text}. Together, these results support a small and directionally consistent random-split optimism effect in this retrospective Block B task. Its exact magnitude varies with the split and should not be treated as a universal or operationally important bias without a decision-specific cost analysis.
 
 The direction is not universal across information blocks, even for the same XGBoost family:
 
@@ -450,9 +525,11 @@ Grouped permutation of each original Block B field on the exact 2022/23–2023/2
 
 With only {int(importance.permutation_repeats.iloc[0])} permutations, the table reports the mean and sample standard deviation; empirical 2.5th and 97.5th percentiles are too coarsely resolved to interpret. This analysis measures the fitted model's dependence on each recorded field, not a causal effect. High importance does not mean that a variable causes greater fire spread. Correlated or overlapping fields can share importance; in particular, `CAUSE_OF_FIRE`, `SOURCE_OF_IGNITION` and `ITEM_IGNITED` may encode overlapping information. Results apply only to this fitted pipeline, feature set and temporal test set, and negative values are retained rather than truncated.
 
-### RQ3 — First-arrival information
+### Structural/context information
 
 On the same temporal holdout, Block A's {len(audit['feature_blocks']['A'])} structural/context fields achieved AP {selected_temporal.loc['A','pr_auc']:.3f}, an absolute lift of {block_a_lift:.3f} above prevalence. That is {block_a_lift_share:.1%} of Block B's {block_b_lift:.3f} lift using {len(audit['feature_blocks']['B'])} fields. This is a descriptive nested-block comparison, not an operational-utility estimate, because some Block A fields are retrospectively recorded.
+
+### RQ3 — First-arrival information
 
 For validation-selected families, temporal AP rose from {selected_temporal.loc['B','pr_auc']:.3f} in Block B to {selected_temporal.loc['C','pr_auc']:.3f} in Block C, an absolute gain of {rq3_gain:.3f}. `FIRE_SIZE_ON_ARRIVAL` is temporally prior to final `SPREAD_OF_FIRE`, but it is a highly proximal state variable. The Block C result is therefore first-arrival prognosis, not pre-incident building risk and not evidence of deployability before crews arrive.
 
@@ -468,7 +545,7 @@ Expanding-window F1, precision, recall and balanced accuracy use a fixed descrip
 
 Across target, cohort and new-year checks, normalized AP ranged only from {sensitivity_context.normalized_ap.min():.3f} to {sensitivity_context.normalized_ap.max():.3f}. The roof-positive definition had higher raw AP but slightly lower absolute lift ({sensitivity_context.loc[sensitivity_context.analysis == 'roofs_roof_spaces_positive','ap_absolute_lift'].iloc[0]:.3f}) than the main definition ({sensitivity_context.loc[sensitivity_context.analysis == 'main_temporal_definition','ap_absolute_lift'].iloc[0]:.3f}); it should not be read as unambiguously better performance. Across the three split assignments with a fixed estimator seed, random-holdout AP ranged from {stability.pr_auc.min():.3f} to {stability.pr_auc.max():.3f}.
 
-Building-type subgroup AP ranged from {subgroup_low.pr_auc:.3f} for {subgroup_low.building_type} (prevalence {subgroup_low.positive_prevalence:.3f}) to {subgroup_high.pr_auc:.3f} for {subgroup_high.building_type} ({subgroup_high.positive_prevalence:.3f}). At the single global validation-F1 threshold, the Prison subgroup contained {int(prison.positive_count)} positives among {int(prison.n):,} incidents but received no positive predictions (recall and precision both zero). This is evidence that the global analytical threshold does not transfer uniformly across prevalence-defined subgroups; it is not evidence that building type causes fire spread or that the remaining fields lack within-group signal.
+Building-type subgroup AP ranged from {subgroup_low.pr_auc:.3f} for {subgroup_low.building_type} (prevalence {subgroup_low.positive_prevalence:.3f}) to {subgroup_high.pr_auc:.3f} for {subgroup_high.building_type} ({subgroup_high.positive_prevalence:.3f}). {subgroup_threshold_text} This is evidence that the global analytical threshold does not transfer uniformly across prevalence-defined subgroups; it is not evidence that building type causes fire spread or that the remaining fields lack within-group signal.
 
 ## Limitations
 
@@ -514,6 +591,14 @@ def _write_methods_receipt() -> None:
         if selection["selected_hyperparameters"]["temporal"][family]
         == selection["selected_hyperparameters"]["random"][family]
     ]
+    differing_configurations = {
+        family: {
+            "random": selection["selected_hyperparameters"]["random"][family],
+            "temporal": selection["selected_hyperparameters"]["temporal"][family],
+        }
+        for family in ("logistic_regression", "random_forest", "xgboost")
+        if family not in shared_configuration_families
+    }
     manifest = sorted(set([
         str(path.relative_to(ROOT)).replace("\\", "/")
         for base in (ROOT / "outputs", ROOT / "reports")
@@ -574,7 +659,8 @@ def _write_methods_receipt() -> None:
 
 - Full candidate ranges and results: `reports/hyperparameter_plan.md` and `outputs/tables/hyperparameter_search_results.csv`.
 - Selected parameters: `{json.dumps(selection['selected_hyperparameters'])}`
-- Families with identical random and temporal selected hyperparameters: `{shared_configuration_families}`. This includes Random Forest and the primary XGBoost comparator; Logistic Regression differs (`C=1.0` random, `C=0.1` temporal).
+- Families with identical random and temporal selected hyperparameters: `{shared_configuration_families}`.
+- Families with differing selected hyperparameters, including their design-specific settings: `{json.dumps(differing_configurations, sort_keys=True)}`
 - Validation-selected family by block: `{json.dumps(selection['selected_family_by_block'])}`
 - Validation thresholds: `{json.dumps(selection['validation_thresholds'])}`
 - XGBoost device: `{selection['xgboost_device']}`; tree method: `hist`. The configured device is `{cfg['xgboost_device']}` and must match the recorded selection for a result-reproducing rerun.

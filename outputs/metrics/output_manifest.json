@@ -50,6 +50,7 @@
   "outputs/tables/category_support_by_year.csv",
   "outputs/tables/cohort_flow.csv",
   "outputs/tables/column_inventory.csv",
+  "outputs/tables/cross_block_split_difference.csv",
   "outputs/tables/development_validation_performance.csv",
   "outputs/tables/drift_summary.csv",
   "outputs/tables/expanding_window_performance.csv",

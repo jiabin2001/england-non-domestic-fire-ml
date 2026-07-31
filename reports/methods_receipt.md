@@ -53,7 +53,8 @@
 
 - Full candidate ranges and results: `reports/hyperparameter_plan.md` and `outputs/tables/hyperparameter_search_results.csv`.
 - Selected parameters: `{"temporal": {"logistic_regression": {"C": 0.1}, "random_forest": {"n_estimators": 200, "max_depth": null, "min_samples_leaf": 5, "max_features": "sqrt"}, "xgboost": {"n_estimators": 200, "learning_rate": 0.1, "max_depth": 6, "min_child_weight": 5, "subsample": 0.8, "colsample_bytree": 0.8}}, "random": {"logistic_regression": {"C": 1.0}, "random_forest": {"n_estimators": 200, "max_depth": null, "min_samples_leaf": 5, "max_features": "sqrt"}, "xgboost": {"n_estimators": 200, "learning_rate": 0.1, "max_depth": 6, "min_child_weight": 5, "subsample": 0.8, "colsample_bytree": 0.8}}}`
-- Families with identical random and temporal selected hyperparameters: `['random_forest', 'xgboost']`. This includes Random Forest and the primary XGBoost comparator; Logistic Regression differs (`C=1.0` random, `C=0.1` temporal).
+- Families with identical random and temporal selected hyperparameters: `['random_forest', 'xgboost']`.
+- Families with differing selected hyperparameters, including their design-specific settings: `{"logistic_regression": {"random": {"C": 1.0}, "temporal": {"C": 0.1}}}`
 - Validation-selected family by block: `{"temporal": {"A": "xgboost", "B": "xgboost", "C": "xgboost"}, "random": {"A": "xgboost", "B": "xgboost", "C": "xgboost"}}`
 - Validation thresholds: `{"temporal": {"A": {"dummy": 0.2499106767878746, "logistic_regression": 0.2867622375488281, "random_forest": 0.2722170425235016, "xgboost": 0.33036476373672485}, "B": {"dummy": 0.2499106767878746, "logistic_regression": 0.2742215096950531, "random_forest": 0.3519588449756025, "xgboost": 0.2836891710758209}, "C": {"dummy": 0.2499106767878746, "logistic_regression": 0.5661454796791077, "random_forest": 0.4307341088371494, "xgboost": 0.3571653366088867}}, "random": {"A": {"dummy": 0.25722577773877503, "logistic_regression": 0.272072970867157, "random_forest": 0.29698505349039045, "xgboost": 0.29469117522239685}, "B": {"dummy": 0.25722577773877503, "logistic_regression": 0.30903926491737366, "random_forest": 0.3399175365666454, "xgboost": 0.34557846188545227}, "C": {"dummy": 0.25722577773877503, "logistic_regression": 0.4314391613006592, "random_forest": 0.4773128881043004, "xgboost": 0.5401079654693604}}}`
 - XGBoost device: `cuda`; tree method: `hist`. The configured device is `cuda` and must match the recorded selection for a result-reproducing rerun.
@@ -157,6 +158,7 @@
 - `outputs/tables/category_support_by_year.csv`
 - `outputs/tables/cohort_flow.csv`
 - `outputs/tables/column_inventory.csv`
+- `outputs/tables/cross_block_split_difference.csv`
 - `outputs/tables/development_validation_performance.csv`
 - `outputs/tables/drift_summary.csv`
 - `outputs/tables/expanding_window_performance.csv`
