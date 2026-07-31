@@ -18,7 +18,7 @@ def stratified_resample_indices(
     if positive.size + negative.size != labels.size:
         raise ValueError("Bootstrap labels must be binary values 0 and 1.")
     if positive.size == 0 or negative.size == 0:
-        raise ValueError("PR-AUC bootstrap requires both outcome classes.")
+        raise ValueError("Average-precision bootstrap requires both outcome classes.")
     return np.concatenate([
         rng.choice(negative, size=negative.size, replace=True),
         rng.choice(positive, size=positive.size, replace=True),
@@ -85,13 +85,95 @@ def holdout_overlap_summary(
     }
 
 
+def partially_paired_bootstrap_pr_auc(
+    random_predictions: pd.DataFrame,
+    temporal_predictions: pd.DataFrame,
+    repeats: int,
+    rng: np.random.Generator,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Bootstrap two partially overlapping holdouts while preserving their covariance.
+
+    Outcome class and overlap membership are treated as fixed strata. Records shared
+    by both holdouts are resampled once per replicate and used in both scores; the
+    design-specific records are resampled independently.
+    """
+    if repeats < 1:
+        raise ValueError("Bootstrap repeats must be positive.")
+    has_source_id = (
+        "SOURCE_ROW_ID" in random_predictions.columns
+        and "SOURCE_ROW_ID" in temporal_predictions.columns
+    )
+    identifier = "SOURCE_ROW_ID" if has_source_id else None
+    random_ids = pd.Index(
+        random_predictions[identifier] if identifier else random_predictions.index
+    )
+    temporal_ids = pd.Index(
+        temporal_predictions[identifier] if identifier else temporal_predictions.index
+    )
+    if not random_ids.is_unique or not temporal_ids.is_unique:
+        raise ValueError("Holdout identifiers must be unique within each design.")
+
+    common_ids = random_ids.intersection(temporal_ids, sort=False)
+    random_overlap = random_ids.get_indexer(common_ids)
+    temporal_overlap = temporal_ids.get_indexer(common_ids)
+    random_y = random_predictions["LARGER_FIRE"].to_numpy(dtype=int, copy=True)
+    temporal_y = temporal_predictions["LARGER_FIRE"].to_numpy(dtype=int, copy=True)
+    if not np.array_equal(random_y[random_overlap], temporal_y[temporal_overlap]):
+        raise ValueError("Outcome labels disagree for records shared by both holdouts.")
+
+    random_unique_mask = ~random_ids.isin(common_ids)
+    temporal_unique_mask = ~temporal_ids.isin(common_ids)
+    strata: list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]] = []
+    for label in (0, 1):
+        overlap_label = random_y[random_overlap] == label
+        random_shared = random_overlap[overlap_label]
+        temporal_shared = temporal_overlap[overlap_label]
+        random_only = np.flatnonzero(random_unique_mask & (random_y == label))
+        temporal_only = np.flatnonzero(temporal_unique_mask & (temporal_y == label))
+        if random_shared.size + random_only.size == 0:
+            raise ValueError(f"Random holdout has no observations for class {label}.")
+        if temporal_shared.size + temporal_only.size == 0:
+            raise ValueError(f"Temporal holdout has no observations for class {label}.")
+        strata.append((random_shared, temporal_shared, random_only, temporal_only))
+
+    random_probability = random_predictions["probability"].to_numpy(dtype=float, copy=True)
+    temporal_probability = temporal_predictions["probability"].to_numpy(dtype=float, copy=True)
+    random_draws = np.empty(repeats, dtype=float)
+    temporal_draws = np.empty(repeats, dtype=float)
+    for repeat in range(repeats):
+        random_parts: list[np.ndarray] = []
+        temporal_parts: list[np.ndarray] = []
+        for random_shared, temporal_shared, random_only, temporal_only in strata:
+            if random_shared.size:
+                shared_draw = rng.integers(0, random_shared.size, size=random_shared.size)
+                random_parts.append(random_shared[shared_draw])
+                temporal_parts.append(temporal_shared[shared_draw])
+            if random_only.size:
+                random_parts.append(
+                    random_only[rng.integers(0, random_only.size, size=random_only.size)]
+                )
+            if temporal_only.size:
+                temporal_parts.append(
+                    temporal_only[rng.integers(0, temporal_only.size, size=temporal_only.size)]
+                )
+        random_indices = np.concatenate(random_parts)
+        temporal_indices = np.concatenate(temporal_parts)
+        random_draws[repeat] = average_precision_score(
+            random_y[random_indices], random_probability[random_indices]
+        )
+        temporal_draws[repeat] = average_precision_score(
+            temporal_y[temporal_indices], temporal_probability[temporal_indices]
+        )
+    return random_draws, temporal_draws
+
+
 def build_bootstrap_ci_table(
     random_predictions: pd.DataFrame,
     temporal_predictions: pd.DataFrame,
-    repeats: int = 2000,
-    seed: int = 20260811,
+    repeats: int = 100000,
+    seed: int = 20260731,
 ) -> pd.DataFrame:
-    """Summarise fixed-model PR-AUC uncertainty for two partially overlapping holdouts."""
+    """Summarise fixed-model average-precision uncertainty for overlapping holdouts."""
     required = {"LARGER_FIRE", "probability"}
     for design, frame in (("random", random_predictions), ("temporal", temporal_predictions)):
         missing = required - set(frame.columns)
@@ -99,17 +181,13 @@ def build_bootstrap_ci_table(
             raise ValueError(f"{design} predictions missing columns: {sorted(missing)}")
 
     overlap = holdout_overlap_summary(random_predictions, temporal_predictions)
-    child_seeds = np.random.SeedSequence(seed).spawn(2)
-    random_rng, temporal_rng = (np.random.default_rng(child) for child in child_seeds)
+    rng = np.random.default_rng(seed)
     random_y = random_predictions["LARGER_FIRE"].to_numpy(dtype=int, copy=True)
     random_probability = random_predictions["probability"].to_numpy(dtype=float, copy=True)
     temporal_y = temporal_predictions["LARGER_FIRE"].to_numpy(dtype=int, copy=True)
     temporal_probability = temporal_predictions["probability"].to_numpy(dtype=float, copy=True)
-    random_draws = stratified_bootstrap_pr_auc(
-        random_y, random_probability, repeats, random_rng
-    )
-    temporal_draws = stratified_bootstrap_pr_auc(
-        temporal_y, temporal_probability, repeats, temporal_rng
+    random_draws, temporal_draws = partially_paired_bootstrap_pr_auc(
+        random_predictions, temporal_predictions, repeats, rng
     )
 
     random_point = float(average_precision_score(random_y, random_probability))
@@ -140,31 +218,31 @@ def build_bootstrap_ci_table(
 
     return pd.DataFrame([
         row(
-            "PR-AUC",
+            "average precision",
             "random",
             random_point,
             random_draws,
-            "stratified percentile bootstrap",
+            "partially paired class-and-membership-stratified percentile bootstrap",
         ),
         row(
-            "PR-AUC",
+            "average precision",
             "temporal",
             temporal_point,
             temporal_draws,
-            "stratified percentile bootstrap",
+            "partially paired class-and-membership-stratified percentile bootstrap",
         ),
         row(
-            "random-minus-temporal PR-AUC difference",
+            "random-minus-temporal average-precision difference",
             "random-minus-temporal",
             random_point - temporal_point,
             difference_draws,
-            "approximate independent stratified percentile bootstrap; overlap covariance not modelled",
+            "partially paired class-and-membership-stratified percentile bootstrap; shared records resampled jointly",
         ),
     ])
 
 
 def add_pr_auc_prevalence_context(performance: pd.DataFrame) -> pd.DataFrame:
-    """Add prevalence-relative PR-AUC summaries without changing primary metrics."""
+    """Add prevalence-relative average-precision summaries without changing primary metrics."""
     result = performance.copy(deep=True)
     prevalence = result["positive_prevalence"].astype(float)
     pr_auc = result["pr_auc"].astype(float)

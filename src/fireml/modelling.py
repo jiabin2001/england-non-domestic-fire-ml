@@ -1,12 +1,9 @@
 from __future__ import annotations
 
 import json
-import hashlib
 import platform
 import subprocess
 import time
-from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 import joblib
@@ -134,7 +131,7 @@ def _json_ready(value: Any) -> Any:
 
 def write_hyperparameter_plan(baseline: pd.DataFrame, grid: dict[str, list[dict[str, Any]]], device: str) -> None:
     baseline_view = baseline[["design", "model", "pr_auc", "fit_seconds"]]
-    baseline_lines = ["| design | model | validation PR-AUC | fit seconds |", "|---|---|---:|---:|"]
+    baseline_lines = ["| design | model | validation average precision | fit seconds |", "|---|---|---:|---:|"]
     baseline_lines.extend(
         f"| {row.design} | {row.model} | {row.pr_auc:.4f} | {row.fit_seconds:.2f} |"
         for row in baseline_view.itertuples(index=False)
@@ -144,7 +141,7 @@ def write_hyperparameter_plan(baseline: pd.DataFrame, grid: dict[str, list[dict[
 
 ## Status and selection boundary
 
-This plan was written after the Day 1 audit and baseline fits, and before any temporal-test evaluation. Candidate configurations are deliberately compact and are selected only by validation-set PR-AUC. Test performance cannot alter the ranges. The selected configuration is a practical comparison setting, not a claim of theoretical optimality.
+Candidate configurations are deliberately compact and are selected only by validation-set average precision, calculated with scikit-learn's `average_precision_score`. Holdout performance does not alter the candidate set. The selected configuration is a practical comparison setting, not a claim of theoretical optimality.
 
 XGBoost runtime device: `{device}` (`hist` tree method). CUDA is used only when `nvidia-smi` confirms an available GPU; otherwise execution falls back to CPU.
 
@@ -184,7 +181,7 @@ XGBoost runtime device: `{device}` (`hist` tree method). CUDA is used only when 
 
 ## Stability rule
 
-All candidate validation PR-AUC values are retained. The final configuration's margin over adjacent candidates is reported in `hyperparameter_stability_summary.csv`. Expanding-window and sensitivity analyses reuse the locked configuration and do not reopen the search.
+All candidate validation AP values are retained. The selected configuration's margin over adjacent candidates is reported in `hyperparameter_stability_summary.csv`. Expanding-window and sensitivity analyses reuse the selected configuration.
 """
     (ROOT / "reports/hyperparameter_plan.md").write_text(report, encoding="utf-8")
 
@@ -255,15 +252,14 @@ def run_core_models() -> dict[str, Any]:
     development = pd.DataFrame(development_rows)
     development.to_csv(ROOT / "outputs/tables/development_validation_performance.csv", index=False)
 
-    pre_test = {
-        "record_type": "internal_within_run_pre_test_configuration",
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "selection_metric": "validation PR-AUC",
+    selection = {
+        "record_type": "model_selection_record",
+        "selection_metric": "validation average precision (sklearn average_precision_score)",
         "threshold_rule": "maximum validation F1",
         "xgboost_device": device,
         "selected_hyperparameters": chosen,
         "selected_family_by_block": selected_by_block,
-        "locked_thresholds": {
+        "validation_thresholds": {
             design: {
                 block: {
                     row["model"]: row["threshold"]
@@ -281,27 +277,32 @@ def run_core_models() -> dict[str, Any]:
             "random_comparator": "target-stratified with temporal-matched partition sizes",
         },
     }
-    pre_test_path = ROOT / "outputs/metrics/pre_test_model_config.json"
-    pre_test_path.write_text(
-        json.dumps(pre_test, indent=2, default=_json_ready), encoding="utf-8"
+    selection_path = ROOT / "outputs/metrics/model_selection.json"
+    selection_path.write_text(
+        json.dumps(selection, indent=2, default=_json_ready), encoding="utf-8"
     )
-    pre_test_hash = hashlib.sha256(pre_test_path.read_bytes()).hexdigest()
-    # Remove the legacy mutable receipt so it cannot be mistaken for an external record.
+    # Remove deprecated within-run receipt files; the selection record contains only
+    # the configuration required to reproduce the fitted models and thresholds.
+    (ROOT / "outputs/metrics/pre_test_model_config.json").unlink(missing_ok=True)
+    (ROOT / "outputs/metrics/post_test_evaluation_receipt.json").unlink(missing_ok=True)
     (ROOT / "outputs/metrics/locked_model_config.json").unlink(missing_ok=True)
 
-    # Holdout evaluation follows the successful pre-test record write above.
+    # Validation chooses hyperparameters, family and threshold. The test model remains
+    # train-fitted so the validation-derived threshold applies to the same fitted model.
     test_rows = []
     for design, split in splits.items():
-        development_indices = np.concatenate([split["train"], split["validation"]])
         for block, columns in blocks.items():
             for family in ("dummy",) + FAMILIES:
                 params = {} if family == "dummy" else chosen[design][family]
                 pipeline = make_model_pipeline(columns, family, params, seed, n_jobs, device)
                 start = time.perf_counter()
-                pipeline.fit(frame.loc[development_indices, columns], frame.loc[development_indices, "LARGER_FIRE"])
+                pipeline.fit(
+                    frame.loc[split["train"], columns],
+                    frame.loc[split["train"], "LARGER_FIRE"],
+                )
                 seconds = time.perf_counter() - start
                 probability = pipeline.predict_proba(frame.loc[split["test"], columns])[:, 1]
-                threshold = float(pre_test["locked_thresholds"][design][block][family])
+                threshold = float(selection["validation_thresholds"][design][block][family])
                 metrics = classification_metrics(frame.loc[split["test"], "LARGER_FIRE"].to_numpy(), probability, threshold)
                 row = {
                     "design": design, "split_role": "test", "block": block, "model": family,
@@ -355,21 +356,8 @@ def run_core_models() -> dict[str, Any]:
         "n_jobs": n_jobs,
     }
     (ROOT / "outputs/metrics/runtime_environment.json").write_text(json.dumps(runtime, indent=2), encoding="utf-8")
-    post_test = {
-        "record_type": "internal_within_run_post_test_evaluation_receipt",
-        "test_evaluated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "test_evaluation_count_this_run": 1,
-        "pre_test_config_path": "outputs/metrics/pre_test_model_config.json",
-        "pre_test_config_sha256": pre_test_hash,
-        "runtime_environment_path": "outputs/metrics/runtime_environment.json",
-        "runtime_environment": runtime,
-    }
-    (ROOT / "outputs/metrics/post_test_evaluation_receipt.json").write_text(
-        json.dumps(post_test, indent=2, default=_json_ready), encoding="utf-8"
-    )
     return {
-        "pre_test": pre_test,
-        "post_test": post_test,
+        "selection": selection,
         "blocks": blocks,
         "splits": splits,
         "performance": performance,

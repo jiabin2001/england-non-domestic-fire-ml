@@ -125,9 +125,9 @@ def run_grouped_permutation_analysis() -> pd.DataFrame:
     """Explain the fixed Temporal Block B XGBoost pipeline on its saved test set."""
     ensure_output_dirs()
     cfg = load_yaml("config/analysis.yaml")
-    pre_test_path = ROOT / "outputs/metrics/pre_test_model_config.json"
-    pre_test = json.loads(pre_test_path.read_text(encoding="utf-8"))
-    selected = pre_test["selected_family_by_block"]["temporal"]["B"]
+    selection_path = ROOT / "outputs/metrics/model_selection.json"
+    selection = json.loads(selection_path.read_text(encoding="utf-8"))
+    selected = selection["selected_family_by_block"]["temporal"]["B"]
     if selected != "xgboost":
         raise ValueError(
             f"Temporal Block B selected family is {selected!r}, not the required XGBoost."

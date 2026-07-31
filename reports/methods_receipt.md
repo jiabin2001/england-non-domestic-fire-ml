@@ -23,7 +23,7 @@
 - Final rows: 209171; positives: 53804; prevalence: 0.25722495.
 - Exact target mapping: `{"Whole Building/ Affecting more than 2 floors": 1, "Limited to room of origin": 0, "No fire damage": 0, "Roofs/ Roof spaces": null, "Limited to floor of origin (not whole building)": 1, "Limited to item 1st ignited": 0, "Limited to 2 floors": 1}`.
 - Main-estimand rationale: the room→floor→whole-building ordering maps six categories unambiguously; `Roofs/ Roof spaces` is not assigned because it cannot be located unambiguously on that ordering.
-- Official-definition sensitivity: FIRE0304 counts roofs/roof spaces as a larger fire, so map `Roofs/ Roof spaces` to 1. The 2024/25 sensitivity reproduces the official approximately 26% larger-fire proportion.
+- Roof-definition sensitivity: current Fire statistics definitions omit roofs from the larger-fire list, while FIRE0304-linked detailed releases include them. The main target excludes roofs; the sensitivity maps them to 1 and reproduces the published approximately 26% 2024/25 proportion.
 
 ## Feature blocks
 
@@ -42,19 +42,11 @@
 - Temporal test: 2022/23, 2023/24
 - Random comparator: stratified sampling with exactly matching train/validation/test counts.
 - Primary seed: 20260801; stability seeds: [20260801, 20260802, 20260803].
-- Selection metric: validation PR-AUC. Threshold: validation F1 maximum, an analytical operating point rather than an operational optimum.
-- Threshold provenance: thresholds come from validation probabilities of train-fitted models and are then held fixed when selected models are refitted on train+validation. Refitting can shift probabilities, so threshold-dependent test metrics are descriptive; no threshold is reselected on test data.
+- Selection metric: validation average precision (`average_precision_score`). Threshold: validation F1 maximum, an analytical operating point rather than an operational optimum.
+- Legacy output columns and file stems named `pr_auc` store this non-interpolated AP value; no trapezoidal precision–recall curve area is calculated.
+- Threshold provenance: the selected train-fitted pipeline and its validation-derived threshold are evaluated on test without a train+validation refit or test-set retuning.
 - The validation years 2020/21–2021/22 overlap the COVID-disrupted period. The first expanding-window year has positive prevalence 0.325431; this design feature may affect selection and thresholds but does not identify a COVID effect.
-- Expanding-window thresholded metrics use fixed threshold 0.5 and are not directly comparable with main-table thresholded metrics. Annual PR-AUC, prevalence-relative summaries and ROC-AUC are the intended temporal-stability comparisons.
-- Holdout evaluation count in this analysis run: 1.
-
-## Within-run evaluation records
-
-Model configurations and thresholds were programmatically recorded before holdout evaluation within each analysis run. This is an internal procedural safeguard, not an externally timestamped preregistration.
-
-- Pre-test record: `outputs/metrics/pre_test_model_config.json` (`internal_within_run_pre_test_configuration`), generated 2026-07-30T23:36:49.469778+00:00.
-- Post-test record: `outputs/metrics/post_test_evaluation_receipt.json` (`internal_within_run_post_test_evaluation_receipt`), generated 2026-07-30T23:42:11.095077+00:00.
-- The post-test record references pre-test SHA-256 `bb43db178568e72d856aae8949978fc0b5471e87e386d15b853123a5c99052c1`. These files provide an auditable within-run order record; they do not independently verify researcher history outside the run.
+- Expanding-window thresholded metrics use fixed threshold 0.5 and are not directly comparable with main-table thresholded metrics. Annual AP, prevalence-relative summaries and ROC-AUC are the intended temporal-stability comparisons.
 
 ## Hyperparameters and thresholds
 
@@ -62,22 +54,23 @@ Model configurations and thresholds were programmatically recorded before holdou
 - Selected parameters: `{"temporal": {"logistic_regression": {"C": 0.1}, "random_forest": {"n_estimators": 200, "max_depth": null, "min_samples_leaf": 5, "max_features": "sqrt"}, "xgboost": {"n_estimators": 200, "learning_rate": 0.1, "max_depth": 6, "min_child_weight": 5, "subsample": 0.8, "colsample_bytree": 0.8}}, "random": {"logistic_regression": {"C": 1.0}, "random_forest": {"n_estimators": 200, "max_depth": null, "min_samples_leaf": 5, "max_features": "sqrt"}, "xgboost": {"n_estimators": 200, "learning_rate": 0.1, "max_depth": 6, "min_child_weight": 5, "subsample": 0.8, "colsample_bytree": 0.8}}}`
 - Families with identical random and temporal selected hyperparameters: `['random_forest', 'xgboost']`. This includes Random Forest and the primary XGBoost comparator; Logistic Regression differs (`C=1.0` random, `C=0.1` temporal).
 - Validation-selected family by block: `{"temporal": {"A": "xgboost", "B": "xgboost", "C": "xgboost"}, "random": {"A": "xgboost", "B": "xgboost", "C": "xgboost"}}`
-- Locked thresholds: `{"temporal": {"A": {"dummy": 0.2499106767878746, "logistic_regression": 0.2867622375488281, "random_forest": 0.2722170425235016, "xgboost": 0.33036476373672485}, "B": {"dummy": 0.2499106767878746, "logistic_regression": 0.2742215096950531, "random_forest": 0.3519588449756025, "xgboost": 0.2836891710758209}, "C": {"dummy": 0.2499106767878746, "logistic_regression": 0.5661454796791077, "random_forest": 0.4307341088371494, "xgboost": 0.3571653366088867}}, "random": {"A": {"dummy": 0.25722577773877503, "logistic_regression": 0.272072970867157, "random_forest": 0.29698505349039045, "xgboost": 0.29469117522239685}, "B": {"dummy": 0.25722577773877503, "logistic_regression": 0.30903926491737366, "random_forest": 0.3399175365666454, "xgboost": 0.34557846188545227}, "C": {"dummy": 0.25722577773877503, "logistic_regression": 0.4314391613006592, "random_forest": 0.47731288810430045, "xgboost": 0.5401079654693604}}}`
+- Validation thresholds: `{"temporal": {"A": {"dummy": 0.2499106767878746, "logistic_regression": 0.2867622375488281, "random_forest": 0.2722170425235016, "xgboost": 0.33036476373672485}, "B": {"dummy": 0.2499106767878746, "logistic_regression": 0.2742215096950531, "random_forest": 0.3519588449756025, "xgboost": 0.2836891710758209}, "C": {"dummy": 0.2499106767878746, "logistic_regression": 0.5661454796791077, "random_forest": 0.4307341088371494, "xgboost": 0.3571653366088867}}, "random": {"A": {"dummy": 0.25722577773877503, "logistic_regression": 0.272072970867157, "random_forest": 0.29698505349039045, "xgboost": 0.29469117522239685}, "B": {"dummy": 0.25722577773877503, "logistic_regression": 0.30903926491737366, "random_forest": 0.3399175365666454, "xgboost": 0.34557846188545227}, "C": {"dummy": 0.25722577773877503, "logistic_regression": 0.4314391613006592, "random_forest": 0.4773128881043004, "xgboost": 0.5401079654693604}}}`
 - XGBoost device: `cuda`; tree method: `hist`.
 
 ## Fixed-model uncertainty and prevalence context
 
-- PR-AUC intervals use 2,000 stratified bootstrap repeats with seed 20260811; positives and negatives are resampled separately with replacement so both class counts remain fixed.
+- Average-precision intervals use 100,000 partially paired, class-and-membership-stratified bootstrap repeats with seed 20260731.
 - Random and temporal test sets overlap by 3,252 records (12.597815% of random test and 12.597815% of temporal test), based on `SOURCE_ROW_ID` and cross-checked against cohort index.
-- The random-minus-temporal contrast separately resamples these partially overlapping holdouts as an approximate-independent comparison. It is not a paired bootstrap, the holdouts are not fully independent, and covariance induced by overlapping records is not explicitly modelled.
-- Percentile limits are the 2.5th and 97.5th percentiles. They condition on fixed data splits, fitted models and selected hyperparameters; retraining and repeated model selection are outside their scope.
-- PR-AUC baseline, absolute lift and normalized PR-AUC are prevalence-context diagnostics. Normalized PR-AUC is auxiliary and does not replace the primary PR-AUC definition.
+- Shared records are resampled jointly in both holdouts; random-only and temporal-only records are resampled independently. Outcome class and observed overlap membership counts remain fixed.
+- Percentile limits are the 2.5th and 97.5th percentiles. They condition on fixed splits, fitted models and selected settings; repeated end-to-end selection is outside their scope.
+- With estimator seed 20260801 fixed, split seeds [20260801, 20260802, 20260803] give random-minus-temporal AP differences of +0.016, +0.018, +0.009 (range 0.009).
+- AP baseline, absolute lift and normalized AP are prevalence-context diagnostics. Normalized AP is auxiliary and does not replace the primary AP definition.
 
 ## Grouped permutation importance
 
 - The validation-selected Temporal Block B XGBoost pipeline is evaluated on the exact saved 2022/23–2023/24 test indices.
 - Each of the 16 original Block B fields is permuted as a whole before the complete fitted preprocessing-and-model pipeline. This automatically groups all one-hot columns derived from that field.
-- Each field uses 30 repeats with seed 20260821; importance is baseline PR-AUC minus permuted PR-AUC, with negative values retained.
+- Each field uses 30 repeats with seed 20260821; importance is baseline AP minus permuted AP, with negative values retained.
 - `permutation_p02_5` and `permutation_p97_5` are the 2.5th and 97.5th percentiles across random permutations. They describe permutation variability and are not confidence-interval limits.
 - Importance measures model dependence, not a causal effect, and may be shared across correlated or overlapping fields.
 
@@ -134,9 +127,8 @@ Model configurations and thresholds were programmatically recorded before holdou
 - `outputs/metrics/audit_receipt.json`
 - `outputs/metrics/cohort_receipt.json`
 - `outputs/metrics/data_archive_manifest.json`
+- `outputs/metrics/model_selection.json`
 - `outputs/metrics/output_manifest.json`
-- `outputs/metrics/post_test_evaluation_receipt.json`
-- `outputs/metrics/pre_test_model_config.json`
 - `outputs/metrics/predictions_random_block_A.parquet`
 - `outputs/metrics/predictions_random_block_B.parquet`
 - `outputs/metrics/predictions_random_block_C.parquet`

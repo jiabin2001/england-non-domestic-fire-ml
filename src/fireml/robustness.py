@@ -30,27 +30,24 @@ def _fit_validation_then_test(
     development_model.fit(frame.loc[split["train"], columns], frame.loc[split["train"], "LARGER_FIRE"])
     validation_probability = development_model.predict_proba(frame.loc[split["validation"], columns])[:, 1]
     threshold = choose_f1_threshold(frame.loc[split["validation"], "LARGER_FIRE"].to_numpy(), validation_probability)
-    dev = np.concatenate([split["train"], split["validation"]])
-    final_model = make_model_pipeline(columns, family, parameters, seed, n_jobs, device)
-    final_model.fit(frame.loc[dev, columns], frame.loc[dev, "LARGER_FIRE"])
-    probability = final_model.predict_proba(frame.loc[split["test"], columns])[:, 1]
+    probability = development_model.predict_proba(frame.loc[split["test"], columns])[:, 1]
     return classification_metrics(frame.loc[split["test"], "LARGER_FIRE"].to_numpy(), probability, threshold), threshold
 
 
 def run_temporal_robustness() -> dict[str, pd.DataFrame]:
     cfg = load_yaml("config/analysis.yaml")
     audit = json.loads((ROOT / "outputs/metrics/audit_receipt.json").read_text(encoding="utf-8"))
-    pre_test = json.loads((ROOT / "outputs/metrics/pre_test_model_config.json").read_text(encoding="utf-8"))
+    selection = json.loads((ROOT / "outputs/metrics/model_selection.json").read_text(encoding="utf-8"))
     frame = pd.read_parquet(ROOT / cfg["cohort_path"])
     blocks = resolve_blocks(frame.columns)
     columns = blocks["B"]
-    family = pre_test["selected_family_by_block"]["temporal"]["B"]
-    parameters = pre_test["selected_hyperparameters"]["temporal"][family]
-    seed, n_jobs, device = int(cfg["random_seed"]), int(cfg["n_jobs"]), pre_test["xgboost_device"]
+    family = selection["selected_family_by_block"]["temporal"]["B"]
+    parameters = selection["selected_hyperparameters"]["temporal"][family]
+    seed, n_jobs, device = int(cfg["random_seed"]), int(cfg["n_jobs"]), selection["xgboost_device"]
     temporal = make_temporal_split(frame, audit["temporal_train_years"], audit["temporal_validation_years"], audit["temporal_test_years"])
 
-    # Natural annual expanding windows, with locked hyperparameters and a fixed
-    # 0.5 descriptive threshold (primary annual comparison is threshold-free PR-AUC).
+    # Natural annual expanding windows, with selected hyperparameters and a fixed
+    # 0.5 descriptive threshold (primary annual comparison is threshold-free AP).
     expanding_rows = []
     years = audit["main_years"]
     for test_year in years[len(audit["temporal_train_years"]):]:
@@ -63,7 +60,7 @@ def run_temporal_robustness() -> dict[str, pd.DataFrame]:
         metrics = classification_metrics(frame.loc[test_idx, "LARGER_FIRE"].to_numpy(), probability, 0.5)
         expanding_rows.append({
             "train_start": earlier[0], "train_end": earlier[-1], "test_year": test_year,
-            "model": family, "block": "B", "threshold_note": "fixed 0.5; PR-AUC is primary", **metrics,
+            "model": family, "block": "B", "threshold_note": "fixed 0.5; average precision is primary", **metrics,
         })
     expanding = add_pr_auc_prevalence_context(pd.DataFrame(expanding_rows))
     expanding.to_csv(ROOT / "outputs/tables/expanding_window_performance.csv", index=False)
@@ -91,15 +88,17 @@ def run_temporal_robustness() -> dict[str, pd.DataFrame]:
         })
 
     # Optional new-year check: exclude incomplete Suffolk, train through 2023/24,
-    # reuse the primary locked threshold and do not retune on 2024/25.
+    # reuse the primary validation-derived threshold and do not retune on 2024/25.
     extended, _ = construct_cohort(include_2024_excluding_suffolk=True, save_main=False)
     train_idx = extended.index[extended["FINANCIAL_YEAR"].isin(audit["main_years"])].to_numpy()
     test_idx = extended.index[extended["FINANCIAL_YEAR"].eq("2024/25")].to_numpy()
     model = make_model_pipeline(resolve_blocks(extended.columns)["B"], family, parameters, seed, n_jobs, device)
     model.fit(extended.loc[train_idx, columns], extended.loc[train_idx, "LARGER_FIRE"])
     probability = model.predict_proba(extended.loc[test_idx, columns])[:, 1]
-    locked_threshold = float(pre_test["locked_thresholds"]["temporal"]["B"][family])
-    metrics = classification_metrics(extended.loc[test_idx, "LARGER_FIRE"].to_numpy(), probability, locked_threshold)
+    validation_threshold = float(selection["validation_thresholds"]["temporal"]["B"][family])
+    metrics = classification_metrics(
+        extended.loc[test_idx, "LARGER_FIRE"].to_numpy(), probability, validation_threshold
+    )
     sensitivity_rows.append({
         "analysis": "include_2024_25_exclude_suffolk", "test_period": "2024/25",
         "design": "temporal_new_year", "split_role": "test", "block": "B", "model": family,
@@ -108,17 +107,18 @@ def run_temporal_robustness() -> dict[str, pd.DataFrame]:
     sensitivity = pd.DataFrame(sensitivity_rows)
     sensitivity.to_csv(ROOT / "outputs/tables/sensitivity_analysis_results.csv", index=False)
 
-    # Prespecified small random-seed stability check. Seed 1 is recomputed here by
-    # the same locked procedure so all rows have identical provenance.
+    # Random-split stability check: vary only the split assignment while holding
+    # the estimator seed and selected hyperparameters fixed.
     seed_rows = []
     for stability_seed in cfg["random_stability_seeds"]:
         random_split = make_random_split_like(frame, temporal, int(stability_seed))
         metrics, threshold = _fit_validation_then_test(
             frame, random_split, columns, family,
-            pre_test["selected_hyperparameters"]["random"][family], int(stability_seed), n_jobs, device,
+            selection["selected_hyperparameters"]["random"][family], seed, n_jobs, device,
         )
         seed_rows.append({
-            "seed": int(stability_seed), "design": "random", "block": "B", "model": family, **metrics,
+            "split_seed": int(stability_seed), "estimator_seed": seed,
+            "design": "random", "block": "B", "model": family, **metrics,
         })
     random_stability = pd.DataFrame(seed_rows)
     random_stability.to_csv(ROOT / "outputs/tables/random_seed_stability.csv", index=False)
@@ -126,7 +126,7 @@ def run_temporal_robustness() -> dict[str, pd.DataFrame]:
     build_drift_tables(frame, temporal)
     prediction = pd.read_parquet(ROOT / "outputs/metrics/predictions_temporal_block_B.parquet")
     dev_indices = np.concatenate([temporal["train"], temporal["validation"]])
-    subgroup = subgroup_performance(frame, prediction, dev_indices, locked_threshold)
+    subgroup = subgroup_performance(frame, prediction, dev_indices, validation_threshold)
     return {
         "expanding": expanding,
         "sensitivity": sensitivity,

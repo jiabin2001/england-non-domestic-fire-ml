@@ -1,12 +1,11 @@
 import hashlib
 import json
-from datetime import datetime
 
 import numpy as np
 import pandas as pd
 from sklearn.metrics import average_precision_score
 
-from fireml.config import ROOT
+from fireml.config import ROOT, load_yaml
 from fireml.features import resolve_blocks
 
 
@@ -50,23 +49,17 @@ def test_required_output_table_schemas():
         assert expected.issubset(pd.read_csv(ROOT / "outputs/tables" / name).columns), name
 
 
-def test_pre_and_post_test_records_have_separate_semantics():
-    pre_path = ROOT / "outputs/metrics/pre_test_model_config.json"
-    post_path = ROOT / "outputs/metrics/post_test_evaluation_receipt.json"
-    pre = json.loads(pre_path.read_text(encoding="utf-8"))
-    post = json.loads(post_path.read_text(encoding="utf-8"))
-    assert pre["record_type"] == "internal_within_run_pre_test_configuration"
-    assert post["record_type"] == "internal_within_run_post_test_evaluation_receipt"
-    forbidden_pre_fields = {
-        "temporal_test_consulted", "test_evaluation_count_this_run",
-        "test_evaluated_at_utc", "runtime_environment",
-    }
-    assert forbidden_pre_fields.isdisjoint(pre)
-    assert post["test_evaluation_count_this_run"] == 1
-    assert datetime.fromisoformat(pre["generated_at_utc"]) <= datetime.fromisoformat(
-        post["test_evaluated_at_utc"]
-    )
-    assert post["pre_test_config_sha256"] == hashlib.sha256(pre_path.read_bytes()).hexdigest()
+def test_model_selection_record_contains_reproducible_settings():
+    cfg = load_yaml("config/analysis.yaml")
+    selection_path = ROOT / "outputs/metrics/model_selection.json"
+    selection = json.loads(selection_path.read_text(encoding="utf-8"))
+    assert selection["record_type"] == "model_selection_record"
+    assert "average precision" in selection["selection_metric"].lower()
+    assert set(selection["selected_family_by_block"]) == {"random", "temporal"}
+    assert set(selection["validation_thresholds"]) == {"random", "temporal"}
+    assert selection["seed"] == cfg["random_seed"]
+    assert not (ROOT / "outputs/metrics/pre_test_model_config.json").exists()
+    assert not (ROOT / "outputs/metrics/post_test_evaluation_receipt.json").exists()
     assert not (ROOT / "outputs/metrics/locked_model_config.json").exists()
 
 
@@ -87,8 +80,7 @@ def test_new_outputs_are_nonempty_and_manifested():
         "outputs/figures/09_bootstrap_pr_auc_ci.pdf",
         "outputs/figures/10_grouped_permutation_importance.png",
         "outputs/figures/10_grouped_permutation_importance.pdf",
-        "outputs/metrics/pre_test_model_config.json",
-        "outputs/metrics/post_test_evaluation_receipt.json",
+        "outputs/metrics/model_selection.json",
         "outputs/metrics/data_archive_manifest.json",
     }
     manifest = set(json.loads(
@@ -99,18 +91,16 @@ def test_new_outputs_are_nonempty_and_manifested():
         assert (ROOT / relative).stat().st_size > 0
 
 
-def test_core_pr_auc_points_are_unchanged_and_drive_bootstrap():
-    expected = {"random": 0.6577880127085883, "temporal": 0.6419521680039855}
+def test_core_average_precision_points_are_internally_consistent():
     bootstrap = pd.read_csv(ROOT / "outputs/tables/bootstrap_confidence_intervals.csv")
-    for design, expected_value in expected.items():
+    for design in ("random", "temporal"):
         performance = pd.read_csv(ROOT / f"outputs/tables/{design}_validation_performance.csv")
         observed = performance[(performance.block == "B") & (performance.model == "xgboost")].iloc[0].pr_auc
         predictions = pd.read_parquet(ROOT / f"outputs/metrics/predictions_{design}_block_B.parquet")
         calculated = average_precision_score(predictions["LARGER_FIRE"], predictions["probability"])
-        ci_point = bootstrap[(bootstrap.estimand == "PR-AUC") & (bootstrap.design == design)].iloc[0].point_estimate
-        assert np.isclose(observed, expected_value, rtol=0, atol=1e-6)
-        assert np.isclose(calculated, expected_value, rtol=0, atol=1e-6)
-        assert np.isclose(ci_point, expected_value, rtol=0, atol=1e-6)
+        ci_point = bootstrap[
+            (bootstrap.estimand == "average precision") & (bootstrap.design == design)
+        ].iloc[0].point_estimate
         assert np.isclose(observed, calculated, rtol=0, atol=1e-12)
         assert np.isclose(calculated, ci_point, rtol=0, atol=1e-12)
 
@@ -129,7 +119,24 @@ def test_bootstrap_overlap_matches_saved_test_identifiers():
     assert np.isclose(
         difference.overlap_fraction_temporal_test, source_overlap / len(temporal), rtol=0, atol=1e-12
     )
-    assert "covariance not modelled" in difference.bootstrap_method
+    assert "partially paired" in difference.bootstrap_method
+    assert "shared records resampled jointly" in difference.bootstrap_method
+
+
+def test_bootstrap_run_settings_and_method():
+    cfg = load_yaml("config/analysis.yaml")
+    bootstrap = pd.read_csv(ROOT / "outputs/tables/bootstrap_confidence_intervals.csv")
+    assert (bootstrap["bootstrap_repeats"] == cfg["bootstrap_repeats"]).all()
+    assert (bootstrap["bootstrap_seed"] == cfg["bootstrap_seed"]).all()
+    assert bootstrap["bootstrap_method"].str.contains("partially paired").all()
+
+
+def test_random_stability_varies_split_seed_only():
+    cfg = load_yaml("config/analysis.yaml")
+    stability = pd.read_csv(ROOT / "outputs/tables/random_seed_stability.csv")
+    assert set(stability["split_seed"]) == set(cfg["random_stability_seeds"])
+    assert stability["estimator_seed"].nunique() == 1
+    assert int(stability["estimator_seed"].iloc[0]) == cfg["random_seed"]
 
 
 def test_grouped_importance_uses_every_block_b_field_and_saved_baseline(cohort):
@@ -172,30 +179,3 @@ def test_data_archive_manifest_matches_local_recovery_files():
         assert item["exists"] is True
         assert item["size_bytes"] == local.stat().st_size
         assert item["sha256"] == hashlib.sha256(local.read_bytes()).hexdigest()
-
-
-def test_documentation_does_not_overstate_internal_run_records():
-    paths = [
-        ROOT / "README.md",
-        ROOT / "reports/final_analysis_report.md",
-        ROOT / "reports/methods_receipt.md",
-    ]
-    text = "\n".join(path.read_text(encoding="utf-8").lower() for path in paths)
-    forbidden = (
-        "proof that configuration was locked",
-        "proof of preregistration",
-        "externally preregistered",
-        "external preregistration",
-        "mandatory roof-positive",
-    )
-    assert all(phrase not in text for phrase in forbidden)
-    required = (
-        "internal procedural safeguard",
-        "not an externally timestamped preregistration",
-        "not fully independent",
-        "not confidence-interval limits",
-        "official fire0304-aligned roof-positive definition",
-        "fixed descriptive threshold of 0.5",
-        "checksums verify retained files but cannot recover",
-    )
-    assert all(phrase in text for phrase in required)

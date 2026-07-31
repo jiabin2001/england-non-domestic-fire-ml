@@ -2,22 +2,22 @@
 
 ## Status and selection boundary
 
-This plan was written after the Day 1 audit and baseline fits, and before any temporal-test evaluation. Candidate configurations are deliberately compact and are selected only by validation-set PR-AUC. Test performance cannot alter the ranges. The selected configuration is a practical comparison setting, not a claim of theoretical optimality.
+Candidate configurations are deliberately compact and are selected only by validation-set average precision, calculated with scikit-learn's `average_precision_score`. Holdout performance does not alter the candidate set. The selected configuration is a practical comparison setting, not a claim of theoretical optimality.
 
 XGBoost runtime device: `cuda` (`hist` tree method). CUDA is used only when `nvidia-smi` confirms an available GPU; otherwise execution falls back to CPU.
 
 ## Baseline observations
 
-| design | model | validation PR-AUC | fit seconds |
+| design | model | validation average precision | fit seconds |
 |---|---|---:|---:|
-| temporal | dummy | 0.2974 | 0.97 |
-| temporal | logistic_regression | 0.6467 | 1.41 |
-| temporal | random_forest | 0.6267 | 71.97 |
-| temporal | xgboost | 0.6637 | 1.32 |
-| random | dummy | 0.2572 | 0.96 |
-| random | logistic_regression | 0.6312 | 1.32 |
-| random | random_forest | 0.6117 | 74.39 |
-| random | xgboost | 0.6473 | 1.25 |
+| temporal | dummy | 0.2974 | 0.96 |
+| temporal | logistic_regression | 0.6467 | 1.38 |
+| temporal | random_forest | 0.6267 | 70.70 |
+| temporal | xgboost | 0.6637 | 1.27 |
+| random | dummy | 0.2572 | 0.91 |
+| random | logistic_regression | 0.6312 | 1.25 |
+| random | random_forest | 0.6117 | 73.73 |
+| random | xgboost | 0.6473 | 1.22 |
 
 ## Logistic Regression
 
@@ -123,4 +123,4 @@ XGBoost runtime device: `cuda` (`hist` tree method). CUDA is used only when `nvi
 
 ## Stability rule
 
-All candidate validation PR-AUC values are retained. The final configuration's margin over adjacent candidates is reported in `hyperparameter_stability_summary.csv`. Expanding-window and sensitivity analyses reuse the locked configuration and do not reopen the search.
+All candidate validation AP values are retained. The selected configuration's margin over adjacent candidates is reported in `hyperparameter_stability_summary.csv`. Expanding-window and sensitivity analyses reuse the selected configuration.

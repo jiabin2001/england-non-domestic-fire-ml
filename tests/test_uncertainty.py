@@ -10,16 +10,17 @@ from fireml.uncertainty import (
 
 
 def _prediction_frames() -> tuple[pd.DataFrame, pd.DataFrame]:
-    labels = np.array([0] * 30 + [1] * 10)
+    random_ids = np.arange(40)
+    temporal_ids = np.arange(30, 70)
     random = pd.DataFrame({
-        "SOURCE_ROW_ID": np.arange(40),
-        "LARGER_FIRE": labels,
-        "probability": np.linspace(0.02, 0.95, labels.size),
+        "SOURCE_ROW_ID": random_ids,
+        "LARGER_FIRE": (random_ids % 4 == 0).astype(int),
+        "probability": np.linspace(0.02, 0.95, random_ids.size),
     }, index=np.arange(40))
     temporal = pd.DataFrame({
-        "SOURCE_ROW_ID": np.arange(30, 70),
-        "LARGER_FIRE": labels,
-        "probability": np.linspace(0.05, 0.85, labels.size) ** 1.2,
+        "SOURCE_ROW_ID": temporal_ids,
+        "LARGER_FIRE": (temporal_ids % 4 == 0).astype(int),
+        "probability": np.linspace(0.05, 0.85, temporal_ids.size) ** 1.2,
     }, index=np.arange(30, 70))
     return random, temporal
 
@@ -42,15 +43,15 @@ def test_bootstrap_is_reproducible_bounded_and_non_mutating():
     assert_frame_equal(first, second)
     assert_frame_equal(random, random_before)
     assert_frame_equal(temporal, temporal_before)
-    pr_auc_rows = first[first["estimand"] == "PR-AUC"]
+    pr_auc_rows = first[first["estimand"] == "average precision"]
     assert pr_auc_rows["ci_lower_95"].between(0, 1).all()
     assert pr_auc_rows["ci_upper_95"].between(0, 1).all()
     assert (first["ci_lower_95"] <= first["ci_upper_95"]).all()
     difference = first[first["design"] == "random-minus-temporal"].iloc[0]
     assert np.isfinite(difference["ci_lower_95"])
     assert np.isfinite(difference["ci_upper_95"])
-    assert "independent" in difference["bootstrap_method"]
-    assert "covariance not modelled" in difference["bootstrap_method"]
+    assert "partially paired" in difference["bootstrap_method"]
+    assert "shared records resampled jointly" in difference["bootstrap_method"]
     assert difference["overlap_n"] == 10
     assert difference["overlap_fraction_random_test"] == 0.25
     assert difference["overlap_fraction_temporal_test"] == 0.25

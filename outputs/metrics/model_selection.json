@@ -1,7 +1,6 @@
 {
-  "record_type": "internal_within_run_pre_test_configuration",
-  "generated_at_utc": "2026-07-30T23:36:49.469778+00:00",
-  "selection_metric": "validation PR-AUC",
+  "record_type": "model_selection_record",
+  "selection_metric": "validation average precision (sklearn average_precision_score)",
   "threshold_rule": "maximum validation F1",
   "xgboost_device": "cuda",
   "selected_hyperparameters": {
@@ -56,7 +55,7 @@
       "C": "xgboost"
     }
   },
-  "locked_thresholds": {
+  "validation_thresholds": {
     "temporal": {
       "A": {
         "dummy": 0.2499106767878746,
@@ -93,7 +92,7 @@
       "C": {
         "dummy": 0.25722577773877503,
         "logistic_regression": 0.4314391613006592,
-        "random_forest": 0.47731288810430045,
+        "random_forest": 0.4773128881043004,
         "xgboost": 0.5401079654693604
       }
     }

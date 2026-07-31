@@ -154,9 +154,9 @@ The ODS parser initially exposed two unnamed trailing columns and {metadata.get(
 
 ## Target audit
 
-All seven observed `SPREAD_OF_FIRE` strings are listed verbatim in `outputs/tables/spread_of_fire_categories.csv`. Six map unambiguously to the study's ordered room→floor→whole-building spread estimand. `Roofs/ Roof spaces` does not locate an incident unambiguously on that ordering, so it is excluded from the main outcome rather than assigned by assumption. The official FIRE0304 definition counts this category as a larger fire; the official-definition sensitivity therefore maps it positive. There are no missing target strings in logical incident rows.
+All seven observed `SPREAD_OF_FIRE` strings are listed verbatim in `outputs/tables/spread_of_fire_categories.csv`. Six map unambiguously to the study's ordered room→floor→whole-building spread estimand. `Roofs/ Roof spaces` does not locate an incident uniquely on that ordering, so it is excluded from the main outcome. Official sources differ: the current Fire statistics definitions omit roofs from the larger-fire list, while FIRE0304-linked detailed releases include them. The roof-positive sensitivity tests that alternative published convention. There are no missing target strings in logical incident rows.
 
-For 2024/25, the main study estimand (excluding roofs) gives {row_2024['larger_prevalence_main']:.1%} among mappable records. Mapping `Roofs/ Roof spaces` as larger and using all 2024/25 records gives {row_2024['larger_prevalence_roofs_positive_all_records']:.1%}, reproducing the official approximately 26% FIRE0304 proportion. Reporting both definitions makes the difference between the study estimand and the official descriptive-statistics convention explicit.
+For 2024/25, the main study estimand (excluding roofs) gives {row_2024['larger_prevalence_main']:.1%} among mappable records. Mapping `Roofs/ Roof spaces` as larger and using all 2024/25 records gives {row_2024['larger_prevalence_roofs_positive_all_records']:.1%}, reproducing the approximately 26% proportion in the detailed FIRE0304-linked release. Reporting both definitions makes the official-source inconsistency explicit.
 
 ## Time and data quality
 
@@ -177,9 +177,9 @@ For 2024/25, the main study estimand (excluding roofs) gives {row_2024['larger_p
 - Key Block A/B/C fields usable in 2010/11–2023/24: yes; maximum field missingness is {key_missing_max:.1%}.
 - Guidance consistency: no blocking inconsistency found.
 
-## Locked main window
+## Main analysis window
 
-Use 2010/11–2023/24. Exclude exact duplicate rows, late calls and target-excluded rows. Do not use `FINANCIAL_YEAR` or FRS territory as predictors. Continue to baseline modelling, document the compact hyperparameter plan, lock it, and evaluate the temporal test once.
+Use 2010/11–2023/24. Exclude exact duplicate rows, late calls and target-excluded rows. Do not use `FINANCIAL_YEAR` or FRS territory as predictors. Use validation data for compact model selection and evaluate the resulting train-fitted model on the temporal test.
 """
     (ROOT / "reports/day1_feasibility.md").write_text(report, encoding="utf-8")
     receipt = {

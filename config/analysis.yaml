@@ -28,8 +28,8 @@ temporal_validation_years: 2
 temporal_test_years: 2
 random_seed: 20260801
 random_stability_seeds: [20260801, 20260802, 20260803]
-bootstrap_repeats: 2000
-bootstrap_seed: 20260811
+bootstrap_repeats: 100000
+bootstrap_seed: 20260731
 permutation_repeats: 30
 permutation_seed: 20260821
 n_jobs: 4

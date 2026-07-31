@@ -21,13 +21,13 @@ The publisher URL is mutable: a checksum can verify a retained file but cannot r
 ## Main design
 
 - Main cohort: primary other-building fires, 2010/11–2023/24, exact duplicates removed, late calls excluded, and only unambiguously mapped target categories retained.
-- Binary target: `LARGER_FIRE`, derived strictly from observed `SPREAD_OF_FIRE` strings. The main estimand uses the unambiguous room→floor→whole-building ordering and excludes `Roofs/ Roof spaces`, which does not locate an incident unambiguously on that scale. FIRE0304 counts roofs/roof spaces as a larger fire, so an official-definition sensitivity maps it positive.
+- Binary target: `LARGER_FIRE`, derived strictly from observed `SPREAD_OF_FIRE` strings. The main estimand uses the unambiguous room→floor→whole-building ordering and excludes `Roofs/ Roof spaces`. Official sources differ on whether roofs belong in the larger-fire grouping, so a roof-positive sensitivity tests the alternative published convention.
 - Models: prior Dummy baseline, Logistic Regression, Random Forest and XGBoost. The latter three are the only main machine-learning models.
 - Block A: structural and context information.
 - Block B: retrospective incident information. Investigation and estimated-delay limitations mean this is not strictly a dispatch-time model.
 - Block C: first-arrival prognostic information. It is reported separately and cannot support pre-incident or pre-arrival risk claims.
 - Validation: a temporally ordered primary design and a target-stratified random comparator with exactly matching train/validation/test sample sizes.
-- Primary metric: PR-AUC. Because its no-information baseline is approximately the positive prevalence, random–temporal comparisons are reported with prevalence context, ROC-AUC, Brier score and fixed-model bootstrap intervals. The validation-F1 threshold is an analytical operating point, not a business-optimal FRS decision rule.
+- Primary metric: average precision (AP), calculated with scikit-learn's non-interpolated `average_precision_score`. Legacy `pr_auc` column and file stems retain their existing names for compatibility but store this AP value, not trapezoidal area under an interpolated precision–recall curve. Because AP's no-information baseline is approximately the positive prevalence, random–temporal comparisons are reported with prevalence context, ROC-AUC, Brier score and fixed-model bootstrap intervals. The validation-F1 threshold is an analytical operating point, not a business-optimal FRS decision rule.
 - Interpretation: original-field grouped permutation importance is reported only for the validation-selected Temporal Block B XGBoost pipeline. It measures model dependence on the fixed temporal test set, not causal effects.
 
 ## Environment
@@ -77,20 +77,17 @@ python -m pytest -q
 
 ## Key outputs
 
-- `reports/day1_feasibility.md`: blocking feasibility checks and locked time window.
-- `reports/hyperparameter_plan.md`: post-baseline, pre-test compact search plan.
+- `reports/day1_feasibility.md`: feasibility checks and the defined main time window.
+- `reports/hyperparameter_plan.md`: compact validation search plan.
 - `reports/final_analysis_report.md`: results organised around RQ1–RQ3.
 - `reports/methods_receipt.md`: exact source, cohort, target, features, split, parameters, thresholds, uncertainty/interpretability settings, seeds, software and manifest.
-- `outputs/tables/bootstrap_confidence_intervals.csv`: stratified fixed-model PR-AUC intervals, test-set overlap counts and the approximate-independent random-minus-temporal comparison, which does not model overlap covariance.
+- `outputs/tables/bootstrap_confidence_intervals.csv`: 100,000-repeat partially paired fixed-model AP intervals; shared holdout records are resampled jointly so the observed overlap covariance is represented.
 - `outputs/tables/grouped_permutation_importance.csv`: original-field Temporal Block B model-dependence estimates; percentile columns describe random-permutation variability, not confidence intervals.
-- `outputs/tables/pr_auc_prevalence_context.csv`: PR-AUC baseline, absolute lift and auxiliary normalized PR-AUC alongside ROC-AUC and Brier score.
+- `outputs/tables/pr_auc_prevalence_context.csv`: AP baseline, absolute lift and auxiliary normalized AP alongside ROC-AUC and Brier score. The legacy filename is retained for compatibility.
 - `outputs/tables/`: all requested audit, performance, stability, subgroup and sensitivity tables.
 - `outputs/figures/`: ten figures in both PNG and PDF.
 - `outputs/models/`: validation-selected fitted pipelines.
-- `outputs/metrics/pre_test_model_config.json`: internal within-run configuration record written before holdout evaluation.
-- `outputs/metrics/post_test_evaluation_receipt.json`: post-test run receipt referencing the pre-test record hash and runtime environment.
+- `outputs/metrics/model_selection.json`: validation-selected hyperparameters, model families and analytical thresholds required for reproducibility.
 - `outputs/metrics/data_archive_manifest.json`: checksums and sizes for the raw ODS and two reproducibility Parquet files that must be deposited separately.
-
-The two evaluation records are an auditable run-order safeguard. They are programmatically produced within a run and are not an externally timestamped preregistration.
 
 No external GIS, weather, demographic, socioeconomic or commercial-building data are used. No neural network, deep learning, SMOTE comparison, stacking, Bayesian optimisation or large-scale Optuna search is included.

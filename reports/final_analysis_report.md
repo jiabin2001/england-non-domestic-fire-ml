@@ -8,84 +8,86 @@ The analysis predicts incident-level final fire spread among already-recorded pr
 
 ## Data and cohort
 
-The official ODS was updated 22 July 2026. The raw-file SHA-256 is `560e5c1a18731cf8189b28471f6813675d6f95f447d680ec5603d9bb97718595`. The audit found 245,207 logical incident rows across 2010/11–2025/26. The locked main period is 2010/11–2023/24; 2024/25 is excluded because Suffolk submissions are incomplete for part of that year, and 2025/26 is excluded because it spans the IRS-to-FaRDaP transition.
+The official ODS was updated 22 July 2026. The raw-file SHA-256 is `560e5c1a18731cf8189b28471f6813675d6f95f447d680ec5603d9bb97718595`. The audit found 245,207 logical incident rows across 2010/11–2025/26. The defined main period is 2010/11–2023/24; 2024/25 is excluded because Suffolk submissions are incomplete for part of that year, and 2025/26 is excluded because it spans the IRS-to-FaRDaP transition.
 
 After year restriction, 20 exact duplicates, 3,063 late calls and 6,081 `Roofs/ Roof spaces` target records were removed sequentially. The main cohort contains 209,171 incidents, 53,804 larger fires (25.7%).
 
-This roof exclusion is an estimand decision, not a claim that the official statistics use the same binary definition. The study's main target follows the unambiguous room→floor→whole-building ordering; `Roofs/ Roof spaces` cannot be placed unambiguously on that scale. Official FIRE0304 instead counts roofs/roof spaces as a larger fire. The explicitly reported official-definition sensitivity maps it positive and tests the consequence of that convention.
+The main target follows the unambiguous room→floor→whole-building ordering and excludes `Roofs/ Roof spaces`, which cannot be placed uniquely on that scale. Official sources are inconsistent: the current Fire statistics definitions omit roofs from the larger-fire list, while FIRE0304-linked detailed releases include them. The roof-positive sensitivity therefore tests the alternative published convention rather than treating either source as uniquely authoritative.
 
 ## Validation and modelling
 
-Temporal train/validation/test years are 2010/11–2019/20, 2020/21–2021/22 and 2022/23–2023/24. The stratified random comparator has exactly the same 159,533/23,824/25,814 sample sizes. All imputing and encoding were pipeline-fitted on development data only. Compact hyperparameter selection used validation PR-AUC; analytical classification thresholds maximised validation F1. Each threshold was selected from validation probabilities produced by a train-fitted model, then held fixed while the selected model was refitted on train+validation. Because refitting can shift the probability distribution, threshold-dependent test metrics are descriptive operating-point summaries; threshold-free PR-AUC remains primary, and no test-set retuning occurred. Configurations and thresholds were programmatically recorded before the single within-run holdout-evaluation phase.
+Temporal train/validation/test years are 2010/11–2019/20, 2020/21–2021/22 and 2022/23–2023/24. The stratified random comparator has exactly the same 159,533/23,824/25,814 sample sizes. All imputing and encoding were pipeline-fitted on training data only. Compact hyperparameter and family selection used validation average precision (AP), calculated with scikit-learn's non-interpolated `average_precision_score`; analytical classification thresholds maximised validation F1. The selected train-fitted pipeline and its validation-derived threshold were then evaluated once on the corresponding holdout, with no train+validation refit or test-set retuning.
 
 Random Forest, XGBoost selected identical hyperparameters under random and temporal development designs. In particular, the primary XGBoost RQ1 contrast is not confounded by comparing different XGBoost configurations; Logistic Regression selected different regularisation strengths (`C=1.0` random versus `C=0.1` temporal).
 
 The main model comparison is Block B, the retrospective incident-information model:
 
-| model | n | positive_count | positive_prevalence | pr_auc | roc_auc | f1 | brier_score |
+| model | n | positive_count | positive_prevalence | average_precision | roc_auc | f1 | brier_score |
 |---|---|---|---|---|---|---|---|
-| XGBoost | 25814 | 6850 | 0.265 | 0.642 | 0.840 | 0.638 | 0.136 |
-| Random Forest | 25814 | 6850 | 0.265 | 0.635 | 0.836 | 0.634 | 0.138 |
-| Logistic Regression | 25814 | 6850 | 0.265 | 0.629 | 0.831 | 0.631 | 0.139 |
+| XGBoost | 25814 | 6850 | 0.265 | 0.640 | 0.840 | 0.638 | 0.137 |
+| Random Forest | 25814 | 6850 | 0.265 | 0.634 | 0.835 | 0.632 | 0.138 |
+| Logistic Regression | 25814 | 6850 | 0.265 | 0.628 | 0.831 | 0.630 | 0.140 |
 
 ## Research questions
 
 ### RQ1 — Random versus temporal validation
 
-For the validation-selected Block B XGBoost, random holdout PR-AUC was 0.658 (95% stratified bootstrap CI 0.646–0.669) and temporal holdout PR-AUC was 0.642 (0.631–0.653). The random-minus-temporal point difference was +0.016, with a 95% approximate-independent bootstrap interval of -0.001 to +0.031. The holdouts overlap by 3,252 records, 12.6% of the random test set and 12.6% of the temporal test set, calculated by `SOURCE_ROW_ID` and cross-checked against cohort index. They are therefore neither paired nor fully independent. The bootstrap resamples the two holdouts separately as an approximation and does not explicitly model covariance induced by this overlap. The interval included zero, so the +0.016 point difference was not clearly larger than test-sample resampling variation; evidence is insufficient to claim more than a possible modest overestimation in this fixed comparison.
+For the validation-selected Block B XGBoost, random holdout AP was 0.657 (95% bootstrap CI 0.645–0.668) and temporal holdout AP was 0.640 (0.629–0.652). The random-minus-temporal point difference was +0.016, with a 95% partially paired bootstrap interval of +0.0013 to +0.0316. The holdouts overlap by 3,252 records (12.6% of each holdout); those records were resampled jointly, while design-specific records were resampled independently within outcome and membership strata. The interval lay entirely above zero.
 
-These intervals condition on the fixed splits, fitted models and selected hyperparameters. They represent test-sample uncertainty only and do not include variability from retraining or repeating model and hyperparameter selection.
+These intervals condition on the fixed splits, fitted models and selected settings. They represent test-sample uncertainty and the observed overlap covariance, but not variability from repeating the full selection procedure.
 
-PR-AUC's no-information baseline is approximately the positive prevalence. The random and temporal XGBoost holdouts had prevalences of 0.257 and 0.265, respectively, so their PR-AUC values should not be compared mechanically without that context:
+All three Block B model families favoured random splitting in AP (Logistic Regression +0.011, Random Forest +0.018, XGBoost +0.016), and their ROC-AUC differences were also positive. With the estimator seed held fixed, the three random split assignments produced random-minus-temporal AP differences of +0.016, +0.018, +0.009. Together, these results support a small and directionally consistent random-split optimism effect in this retrospective Block B task. Its exact magnitude varies with the split and should not be treated as a universal or operationally important bias without a decision-specific cost analysis.
 
-| design | positive_prevalence | pr_auc | pr_auc_absolute_lift | normalized_pr_auc | roc_auc | brier_score |
+AP's no-information baseline is approximately the positive prevalence. The random and temporal XGBoost holdouts had prevalences of 0.257 and 0.265, respectively, so their AP values are interpreted with prevalence context:
+
+| design | positive_prevalence | average_precision | ap_absolute_lift | normalized_ap | roc_auc | brier_score |
 |---|---|---|---|---|---|---|
-| random | 0.257 | 0.658 | 0.401 | 0.539 | 0.856 | 0.128 |
-| temporal | 0.265 | 0.642 | 0.377 | 0.513 | 0.840 | 0.136 |
+| random | 0.257 | 0.657 | 0.399 | 0.538 | 0.855 | 0.129 |
+| temporal | 0.265 | 0.640 | 0.375 | 0.510 | 0.840 | 0.137 |
 
-Normalized PR-AUC is shown only as an auxiliary prevalence-relative summary, not as a uniquely accepted primary metric. The +0.016 raw PR-AUC difference is therefore interpreted jointly with prevalence, ROC-AUC, Brier score and the bootstrap interval. PR-AUC 0.642 is an area-under-curve measure, not “64.2% accuracy.”
+Normalized AP is an auxiliary prevalence-relative summary, not a replacement primary metric. AP 0.640 is a ranking summary, not “64.0% accuracy.”
 
 ### RQ2 — Best later-year model
 
-XGBoost had the highest temporal Block B PR-AUC (0.642), followed by Random Forest (0.635) and Logistic Regression (0.629). The margins are small relative to the much larger gain from adding information, so the result supports XGBoost within this prespecified comparison rather than a universal algorithm ranking.
+XGBoost had the highest temporal Block B AP (0.640), followed by Random Forest (0.634) and Logistic Regression (0.628). The margins are small and no pairwise model-difference interval was estimated, so XGBoost is described only as the highest-performing evaluated family.
 
-Grouped permutation of each original Block B field on the exact 2022/23–2023/24 temporal test set gave the following five largest mean PR-AUC decreases:
+Grouped permutation of each original Block B field on the exact 2022/23–2023/24 temporal test set gave the following five largest mean AP decreases:
 
 | feature | mean_pr_auc_decrease | std_pr_auc_decrease | permutation_p02_5 | permutation_p97_5 |
 |---|---|---|---|---|
-| BUILDING_TYPE | 0.109 | 0.003 | 0.103 | 0.114 |
-| ITEM_IGNITED | 0.034 | 0.003 | 0.027 | 0.041 |
-| ALARM_SYSTEM | 0.031 | 0.003 | 0.025 | 0.036 |
-| FIRE_START_LOCATION | 0.026 | 0.002 | 0.023 | 0.029 |
-| IGNITION_TO_DISCOVERY | 0.022 | 0.002 | 0.018 | 0.025 |
+| BUILDING_TYPE | 0.112 | 0.003 | 0.107 | 0.116 |
+| ITEM_IGNITED | 0.033 | 0.003 | 0.027 | 0.040 |
+| ALARM_SYSTEM | 0.031 | 0.003 | 0.026 | 0.036 |
+| FIRE_START_LOCATION | 0.027 | 0.002 | 0.023 | 0.030 |
+| IGNITION_TO_DISCOVERY | 0.021 | 0.002 | 0.017 | 0.024 |
 
 The `permutation_p02_5`–`permutation_p97_5` range is the 2.5th–97.5th percentile range across 30 random permutations; it describes permutation randomness and is not a 95% confidence interval. This analysis measures the fitted model's dependence on each recorded field, not a causal effect. High importance does not mean that a variable causes greater fire spread. Correlated or overlapping fields can share importance; in particular, `CAUSE_OF_FIRE`, `SOURCE_OF_IGNITION` and `ITEM_IGNITED` may encode overlapping information. Results apply only to this fitted pipeline, feature set and temporal test set, and negative values are retained rather than truncated.
 
 ### RQ3 — First-arrival information
 
-For validation-selected families, temporal PR-AUC rose from 0.642 in Block B to 0.982 in Block C, an absolute gain of 0.340. `FIRE_SIZE_ON_ARRIVAL` is temporally prior to final `SPREAD_OF_FIRE`, but it is a highly proximal state variable. The Block C result is therefore first-arrival prognosis, not pre-incident building risk and not evidence of deployability before crews arrive.
+For validation-selected families, temporal AP rose from 0.640 in Block B to 0.982 in Block C, an absolute gain of 0.342. `FIRE_SIZE_ON_ARRIVAL` is temporally prior to final `SPREAD_OF_FIRE`, but it is a highly proximal state variable. The Block C result is therefore first-arrival prognosis, not pre-incident building risk and not evidence of deployability before crews arrive.
 
 ## Temporal stability and sensitivity
 
-| test_year | positive_prevalence | pr_auc | pr_auc_absolute_lift | normalized_pr_auc | roc_auc |
+| test_year | positive_prevalence | average_precision | ap_absolute_lift | normalized_ap | roc_auc |
 |---|---|---|---|---|---|
 | 2020/21 | 0.325 | 0.687 | 0.362 | 0.537 | 0.840 |
 | 2021/22 | 0.272 | 0.643 | 0.371 | 0.510 | 0.840 |
 | 2022/23 | 0.286 | 0.655 | 0.369 | 0.517 | 0.838 |
 | 2023/24 | 0.244 | 0.628 | 0.384 | 0.508 | 0.842 |
 
-Across these 4 later-year folds, raw PR-AUC ranged from 0.628 to 0.687 (range 0.060) and had the same rank ordering as prevalence (Spearman 1.000). In contrast, ROC-AUC varied by only 0.004, PR-AUC absolute lift by 0.022, and normalized PR-AUC by 0.029. This pattern supports relatively stable later-year discrimination and shows that the apparent raw PR-AUC decline substantially tracks the changing prevalence baseline. With only four annual folds, it does not establish that prevalence explains all variation or identify why prevalence changed.
+Across these 4 later-year folds, AP ranged from 0.628 to 0.687 and had the same rank ordering as prevalence (Spearman 1.000). ROC-AUC varied by only 0.004, AP absolute lift by 0.022, and normalized AP by 0.029. This supports stable later-year ranking performance while showing that much of the raw AP movement accompanies a changing prevalence baseline; four annual folds cannot identify why prevalence changed.
 
 Expanding-window F1, precision, recall and balanced accuracy use a fixed descriptive threshold of 0.5 and are not directly comparable with the main table's validation-F1 operating point. The 2020/21–2021/22 validation window overlaps the COVID-disrupted period, and 2020/21 has the highest expanding-window prevalence (0.325); this may affect selected settings and thresholds. No policy or COVID attribution is made.
 
-| analysis | test_period | n | positive_prevalence | pr_auc | roc_auc | f1 |
+| analysis | test_period | n | positive_prevalence | average_precision | roc_auc | f1 |
 |---|---|---|---|---|---|---|
-| main_temporal_definition | 2022/23-2023/24 | 25814 | 0.265 | 0.642 | 0.840 | 0.638 |
-| roofs_roof_spaces_positive | 2022/23-2023/24 | 26577 | 0.286 | 0.659 | 0.840 | 0.653 |
-| include_late_calls | 2022/23-2023/24 | 26108 | 0.263 | 0.640 | 0.840 | 0.639 |
+| main_temporal_definition | 2022/23-2023/24 | 25814 | 0.265 | 0.640 | 0.840 | 0.638 |
+| roofs_roof_spaces_positive | 2022/23-2023/24 | 26577 | 0.286 | 0.658 | 0.840 | 0.653 |
+| include_late_calls | 2022/23-2023/24 | 26108 | 0.263 | 0.639 | 0.840 | 0.638 |
 | include_2024_25_exclude_suffolk | 2024/25 | 12553 | 0.241 | 0.630 | 0.846 | 0.623 |
 
-The official FIRE0304-aligned roof-positive definition increased temporal Block B PR-AUC to 0.659. Reintroducing late calls produced 0.640. A separate 2024/25 check excluding Suffolk produced 0.630; it remains secondary because the main time window was locked before modelling. Across three prespecified random seeds, PR-AUC ranged from 0.651 to 0.658.
+The alternative roof-positive convention produced temporal Block B AP 0.658. Reintroducing late calls produced 0.639, and the 2024/25 check excluding Suffolk produced 0.630. Across the three split assignments with a fixed estimator seed, random-holdout AP ranged from 0.650 to 0.659.
 
 ## Limitations
 
@@ -93,13 +95,13 @@ The official FIRE0304-aligned roof-positive definition increased temporal Block 
 - Incident fields may reflect officer judgement; cause/ignition fields may be revised after investigation, and delay fields may be estimated.
 - Block B is retrospective and not strictly dispatch-time information.
 - Block C's exceptional performance is dominated by proximity to the final outcome and must remain a separate prognostic scenario.
-- PR-AUC is prevalence-sensitive; cross-split and subgroup comparisons require their respective positive prevalences.
+- Average precision is prevalence-sensitive; cross-split and subgroup comparisons require their respective positive prevalences.
 - Hyperparameters and analytical thresholds were selected using 2020/21–2021/22, a validation window that overlaps the COVID-disrupted period and includes an unusually high-prevalence first year.
-- Validation-selected thresholds were transferred to models refitted on train+validation; any probability shift makes threshold-dependent test metrics descriptive rather than re-optimised operating points.
+- Bootstrap intervals condition on the fixed splits, fitted models and selected settings; they do not represent repeated end-to-end model-selection uncertainty.
 - Subgroup and permutation results are descriptive model diagnostics, not evidence of differential or variable-level causal effects.
 - Temporal performance differences do not by themselves identify why distributions changed.
 - The publisher URL can be replaced in future. Checksums verify retained files but cannot recover them; the ODS and reproducibility Parquet files require a separate durable institutional deposit.
 
 ## Reproducibility
 
-All tables, figures, fitted selected pipelines, split assignments, within-run pre/post-test records, software versions and exact method decisions are saved under `outputs/` and `reports/`. From an existing ODS or Parquet cache, run `python scripts/06_build_report.py` after installing the pinned project environment.
+All tables, figures, fitted selected pipelines, split assignments, model-selection settings, software versions and method decisions are saved under `outputs/` and `reports/`. From an existing ODS or Parquet cache, run `python scripts/06_build_report.py` after installing the pinned project environment.
