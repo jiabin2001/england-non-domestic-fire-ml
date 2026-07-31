@@ -57,7 +57,8 @@ def test_required_output_table_schemas():
             "random_ap_median", "random_ap_q1", "random_ap_q3",
             "random_ap_min", "random_ap_max", "ap_difference_median",
             "ap_difference_q1", "ap_difference_q3", "ap_difference_min",
-            "ap_difference_max", "positive_difference_count",
+            "ap_difference_max", "ap_difference_range_width",
+            "positive_difference_count",
             "positive_difference_fraction",
         },
     }
@@ -185,6 +186,10 @@ def test_random_stability_summary_matches_seed_level_receipt():
     assert np.isclose(summary.ap_difference_median, differences.median())
     assert np.isclose(summary.ap_difference_q1, differences.quantile(0.25))
     assert np.isclose(summary.ap_difference_q3, differences.quantile(0.75))
+    assert np.isclose(
+        summary.ap_difference_range_width,
+        differences.max() - differences.min(),
+    )
     assert int(summary.positive_difference_count) == int(differences.gt(0).sum())
 
 

@@ -307,12 +307,34 @@ def _summarize_random_stability(
         "ap_difference_q3": differences.quantile(0.75),
         "ap_difference_min": differences.min(),
         "ap_difference_max": differences.max(),
+        "ap_difference_range_width": differences.max() - differences.min(),
         "positive_difference_count": int(differences.gt(0).sum()),
         "positive_difference_fraction": differences.gt(0).mean(),
     }])
 
 
-def _write_final_report() -> None:
+def _write_random_stability_summary() -> pd.Series:
+    cfg = load_yaml("config/analysis.yaml")
+    selection = json.loads(
+        (ROOT / "outputs/metrics/model_selection.json").read_text(encoding="utf-8")
+    )
+    family = selection["selected_family_by_block"]["temporal"]["B"]
+    temporal = pd.read_csv(ROOT / "outputs/tables/temporal_validation_performance.csv")
+    temporal_ap = temporal[
+        temporal["block"].eq("B") & temporal["model"].eq(family)
+    ].iloc[0].pr_auc
+    stability = pd.read_csv(ROOT / "outputs/tables/random_seed_stability.csv")
+    summary = _summarize_random_stability(
+        stability,
+        float(temporal_ap),
+        cfg["random_stability_seeds"],
+        int(cfg["random_seed"]),
+    )
+    summary.to_csv(ROOT / "outputs/tables/random_seed_stability_summary.csv", index=False)
+    return summary.iloc[0]
+
+
+def _write_final_report(stability_summary: pd.Series) -> None:
     cfg = load_yaml("config/analysis.yaml")
     metadata = json.loads((ROOT / "data/raw/source_metadata.json").read_text(encoding="utf-8"))
     audit = json.loads((ROOT / "outputs/metrics/audit_receipt.json").read_text(encoding="utf-8"))
@@ -322,7 +344,6 @@ def _write_final_report() -> None:
     block = pd.read_csv(ROOT / "outputs/tables/block_comparison.csv")
     expanding = pd.read_csv(ROOT / "outputs/tables/expanding_window_performance.csv")
     sensitivity = pd.read_csv(ROOT / "outputs/tables/sensitivity_analysis_results.csv")
-    stability = pd.read_csv(ROOT / "outputs/tables/random_seed_stability.csv")
     bootstrap = pd.read_csv(ROOT / "outputs/tables/bootstrap_confidence_intervals.csv")
     prevalence_context = pd.read_csv(ROOT / "outputs/tables/pr_auc_prevalence_context.csv")
     importance = pd.read_csv(ROOT / "outputs/tables/grouped_permutation_importance.csv")
@@ -383,6 +404,8 @@ def _write_final_report() -> None:
     random_ci = bootstrap[(bootstrap.estimand == "average precision") & (bootstrap.design == "random")].iloc[0]
     temporal_ci = bootstrap[(bootstrap.estimand == "average precision") & (bootstrap.design == "temporal")].iloc[0]
     difference_ci = bootstrap[bootstrap.design == "random-minus-temporal"].iloc[0]
+    bootstrap_difference_width = float(difference_ci.ci_upper_95 - difference_ci.ci_lower_95)
+    stability_difference_width = float(stability_summary.ap_difference_range_width)
     context_core = prevalence_context[prevalence_context.model == core_family].copy()
     importance_top = importance.head(5).copy()
     selected_temporal = block[block.design == "temporal"].set_index("block")
@@ -421,22 +444,15 @@ def _write_final_report() -> None:
         family_ap_direction_text = "All three Block B model families favoured temporal splitting in AP"
     else:
         family_ap_direction_text = "The Block B model-family AP differences were mixed in direction"
+    primary_split_family_ap_text = (
+        family_ap_direction_text[0].lower() + family_ap_direction_text[1:]
+    )
     if family_comparison["roc_auc_difference"].gt(0).all():
         family_roc_direction_text = "were also positive"
     elif family_comparison["roc_auc_difference"].lt(0).all():
         family_roc_direction_text = "were all negative"
     else:
         family_roc_direction_text = "were mixed in sign or included zero"
-    stability_summary_table = _summarize_random_stability(
-        stability,
-        float(temporal_core.pr_auc),
-        cfg["random_stability_seeds"],
-        int(cfg["random_seed"]),
-    )
-    stability_summary_table.to_csv(
-        ROOT / "outputs/tables/random_seed_stability_summary.csv", index=False
-    )
-    stability_summary = stability_summary_table.iloc[0]
     stability_count = int(stability_summary.split_count)
     stability_positive_count = int(stability_summary.positive_difference_count)
     if stability_positive_count == stability_count:
@@ -564,9 +580,11 @@ The main model comparison is Block B, the retrospective incident-information mod
 
 For the validation-selected Block B XGBoost, random holdout AP was {random_core.pr_auc:.3f} (95% bootstrap CI {random_ci.ci_lower_95:.3f}–{random_ci.ci_upper_95:.3f}) and temporal holdout AP was {temporal_core.pr_auc:.3f} ({temporal_ci.ci_lower_95:.3f}–{temporal_ci.ci_upper_95:.3f}). The random-minus-temporal point difference was {difference_ci.point_estimate:+.3f}, with a 95% partially paired bootstrap interval of {difference_ci.ci_lower_95:+.4f} to {difference_ci.ci_upper_95:+.4f}. The holdouts overlap by {int(difference_ci.overlap_n):,} records ({difference_ci.overlap_fraction_random_test:.1%} of each holdout); those records were resampled jointly, while design-specific records were resampled independently within outcome and membership strata. The interval {difference_relation}.
 
-These intervals condition on the fixed splits, fitted models and selected settings. They represent test-sample uncertainty and the observed overlap covariance, but not variability from repeating the full selection procedure.
+Across-assignment stability was assessed using {stability_count} consecutive split seeds. The original three were retained, and the 17 additions were fixed as a set before their results were inspected. With the estimator seed held fixed, they produced a median random-minus-temporal AP difference of {stability_summary.ap_difference_median:+.3f} (IQR {stability_summary.ap_difference_q1:+.3f} to {stability_summary.ap_difference_q3:+.3f}; range {stability_summary.ap_difference_min:+.3f} to {stability_summary.ap_difference_max:+.3f}); {stability_direction_text}. {stability_interpretation}
 
-{family_ap_direction_text} ({family_difference_text}), and their ROC-AUC differences {family_roc_direction_text}. With the estimator seed held fixed, {stability_count} random split assignments produced a median random-minus-temporal AP difference of {stability_summary.ap_difference_median:+.3f} (IQR {stability_summary.ap_difference_q1:+.3f} to {stability_summary.ap_difference_q3:+.3f}; range {stability_summary.ap_difference_min:+.3f} to {stability_summary.ap_difference_max:+.3f}); {stability_direction_text}. {stability_interpretation} Its exact magnitude varies with the split and should not be treated as a universal or operationally important bias without a decision-specific cost analysis. These repeated splits form an empirical sensitivity analysis under fixed model settings, not a second bootstrap interval or {stability_count} independent datasets.
+The fixed-split bootstrap interval and across-split point range address different uncertainty sources. The former excludes zero only conditional on the primary splits, fitted models and selected settings; the negative minimum across the alternative assignments shows that the sign is not invariant to split assignment. Their widths were similar (approximately {bootstrap_difference_width:.3f} and {stability_difference_width:.3f}), but the quantities are dependent and neither is a joint interval or a measure of total uncertainty across test sampling and split assignment.
+
+For the primary split, {primary_split_family_ap_text} ({family_difference_text}), and the corresponding ROC-AUC differences {family_roc_direction_text}. The exact magnitude of random-split optimism varies with the split and should not be treated as universal or operationally important without a decision-specific cost analysis. The repeated splits are an empirical sensitivity analysis under fixed model settings, not a second bootstrap interval or {stability_count} independent datasets.
 
 The direction is not universal across information blocks, even for the same XGBoost family:
 
@@ -635,7 +653,7 @@ All tables, figures, fitted selected pipelines, split assignments, model-selecti
     (ROOT / "reports/final_analysis_report.md").write_text(report, encoding="utf-8")
 
 
-def _write_methods_receipt() -> None:
+def _write_methods_receipt(stability_summary: pd.Series) -> None:
     cfg = load_yaml("config/analysis.yaml")
     metadata = json.loads((ROOT / "data/raw/source_metadata.json").read_text(encoding="utf-8"))
     audit = json.loads((ROOT / "outputs/metrics/audit_receipt.json").read_text(encoding="utf-8"))
@@ -644,22 +662,10 @@ def _write_methods_receipt() -> None:
     runtime = json.loads((ROOT / "outputs/metrics/runtime_environment.json").read_text(encoding="utf-8"))
     archive = json.loads((ROOT / "outputs/metrics/data_archive_manifest.json").read_text(encoding="utf-8"))
     expanding = pd.read_csv(ROOT / "outputs/tables/expanding_window_performance.csv")
-    stability = pd.read_csv(ROOT / "outputs/tables/random_seed_stability.csv")
     bootstrap = pd.read_csv(ROOT / "outputs/tables/bootstrap_confidence_intervals.csv")
     overlap = bootstrap[bootstrap.design == "random-minus-temporal"].iloc[0]
-    temporal_point = bootstrap[
-        (bootstrap.estimand == "average precision") & (bootstrap.design == "temporal")
-    ].iloc[0].point_estimate
-    stability_summary_table = _summarize_random_stability(
-        stability,
-        float(temporal_point),
-        cfg["random_stability_seeds"],
-        int(cfg["random_seed"]),
-    )
-    stability_summary_table.to_csv(
-        ROOT / "outputs/tables/random_seed_stability_summary.csv", index=False
-    )
-    stability_summary = stability_summary_table.iloc[0]
+    bootstrap_difference_width = float(overlap.ci_upper_95 - overlap.ci_lower_95)
+    stability_difference_width = float(stability_summary.ap_difference_range_width)
     policy = load_yaml("config/feature_policy.yaml")
     shared_configuration_families = [
         family for family in ("logistic_regression", "random_forest", "xgboost")
@@ -751,8 +757,9 @@ def _write_methods_receipt() -> None:
 
 ## Split-assignment stability
 
-- The {int(stability_summary.split_count)} configured split seeds are listed in `config/analysis.yaml`; complete seed-level results are in `outputs/tables/random_seed_stability.csv`.
+- The {int(stability_summary.split_count)} consecutive split seeds are listed in `config/analysis.yaml`. The original three were retained; the 17 additions were specified before their results were inspected. Complete seed-level results are in `outputs/tables/random_seed_stability.csv`.
 - With estimator seed {cfg['random_seed']} and selected random-design hyperparameters fixed, the median random-minus-temporal AP difference was {stability_summary.ap_difference_median:+.6f} (IQR {stability_summary.ap_difference_q1:+.6f} to {stability_summary.ap_difference_q3:+.6f}; range {stability_summary.ap_difference_min:+.6f} to {stability_summary.ap_difference_max:+.6f}). Positive differences occurred for {int(stability_summary.positive_difference_count)} of {int(stability_summary.split_count)} assignments.
+- The primary fixed-split bootstrap interval width was {bootstrap_difference_width:.6f}; the across-split point range width was {stability_difference_width:.6f}. They describe dependent, different uncertainty sources and are not combined into a joint interval.
 - This is an empirical split-assignment sensitivity analysis, not a Monte Carlo bootstrap or a repetition of end-to-end family/hyperparameter selection. It does not require a second bootstrap; the separate fixed-model bootstrap remains configured at {cfg['bootstrap_repeats']:,} repeats.
 
 ## Grouped permutation importance
@@ -792,4 +799,6 @@ def build_report() -> None:
     _workflow_figure(); _annual_figure(); _random_temporal_figure(); _expanding_figure()
     _block_figure(); _confusion_and_calibration(); _subgroup_figure()
     _bootstrap_figure(); _grouped_permutation_figure()
-    _write_final_report(); _write_methods_receipt()
+    stability_summary = _write_random_stability_summary()
+    _write_final_report(stability_summary)
+    _write_methods_receipt(stability_summary)

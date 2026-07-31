@@ -70,8 +70,9 @@
 
 ## Split-assignment stability
 
-- The 20 configured split seeds are listed in `config/analysis.yaml`; complete seed-level results are in `outputs/tables/random_seed_stability.csv`.
+- The 20 consecutive split seeds are listed in `config/analysis.yaml`. The original three were retained; the 17 additions were specified before their results were inspected. Complete seed-level results are in `outputs/tables/random_seed_stability.csv`.
 - With estimator seed 20260801 and selected random-design hyperparameters fixed, the median random-minus-temporal AP difference was +0.013670 (IQR +0.009221 to +0.016894; range -0.001135 to +0.028112). Positive differences occurred for 19 of 20 assignments.
+- The primary fixed-split bootstrap interval width was 0.030232; the across-split point range width was 0.029247. They describe dependent, different uncertainty sources and are not combined into a joint interval.
 - This is an empirical split-assignment sensitivity analysis, not a Monte Carlo bootstrap or a repetition of end-to-end family/hyperparameter selection. It does not require a second bootstrap; the separate fixed-model bootstrap remains configured at 100,000 repeats.
 
 ## Grouped permutation importance
