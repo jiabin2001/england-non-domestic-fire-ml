@@ -26,7 +26,10 @@ def test_required_output_table_schemas():
             "test_year", "positive_prevalence", "pr_auc", "pr_auc_baseline",
             "pr_auc_absolute_lift", "normalized_pr_auc", "roc_auc",
         },
-        "sensitivity_analysis_results.csv": {"analysis", "test_period", "pr_auc"},
+        "sensitivity_analysis_results.csv": {
+            "analysis", "test_period", "positive_prevalence", "pr_auc",
+            "pr_auc_baseline", "pr_auc_absolute_lift", "normalized_pr_auc",
+        },
         "bootstrap_confidence_intervals.csv": {
             "estimand", "design", "point_estimate", "ci_lower_95", "ci_upper_95",
             "bootstrap_repeats", "bootstrap_seed", "bootstrap_method",
@@ -36,8 +39,8 @@ def test_required_output_table_schemas():
         },
         "grouped_permutation_importance.csv": {
             "feature", "baseline_pr_auc", "mean_permuted_pr_auc",
-            "mean_pr_auc_decrease", "std_pr_auc_decrease", "permutation_p02_5",
-            "permutation_p97_5", "permutation_repeats", "permutation_seed",
+            "mean_pr_auc_decrease", "std_pr_auc_decrease",
+            "permutation_repeats", "permutation_seed",
         },
         "pr_auc_prevalence_context.csv": {
             "design", "block", "model", "positive_prevalence", "pr_auc",
@@ -58,16 +61,24 @@ def test_model_selection_record_contains_reproducible_settings():
     assert set(selection["selected_family_by_block"]) == {"random", "temporal"}
     assert set(selection["validation_thresholds"]) == {"random", "temporal"}
     assert selection["seed"] == cfg["random_seed"]
+    assert selection["xgboost_device"] == cfg["xgboost_device"]
     assert not (ROOT / "outputs/metrics/pre_test_model_config.json").exists()
     assert not (ROOT / "outputs/metrics/post_test_evaluation_receipt.json").exists()
     assert not (ROOT / "outputs/metrics/locked_model_config.json").exists()
 
 
-def test_all_ten_figures_have_png_and_pdf():
+def test_all_figures_have_matching_png_and_pdf_files():
+    expected = {
+        "01_study_workflow", "02_annual_count_prevalence",
+        "03_random_vs_temporal_pr_auc", "04_expanding_window_performance",
+        "05_information_block_comparison", "06_best_temporal_confusion_matrix",
+        "07_best_temporal_calibration", "08_building_type_subgroups",
+        "09_bootstrap_pr_auc_ci", "10_grouped_permutation_importance",
+    }
     png = sorted((ROOT / "outputs/figures").glob("*.png"))
     pdf = sorted((ROOT / "outputs/figures").glob("*.pdf"))
-    assert len(png) == 10
-    assert len(pdf) == 10
+    assert {path.stem for path in png} == expected
+    assert {path.stem for path in pdf} == expected
     assert all(path.stat().st_size > 0 for path in png + pdf)
 
 

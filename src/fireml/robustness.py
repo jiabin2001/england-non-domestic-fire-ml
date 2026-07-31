@@ -44,6 +44,7 @@ def run_temporal_robustness() -> dict[str, pd.DataFrame]:
     family = selection["selected_family_by_block"]["temporal"]["B"]
     parameters = selection["selected_hyperparameters"]["temporal"][family]
     seed, n_jobs, device = int(cfg["random_seed"]), int(cfg["n_jobs"]), selection["xgboost_device"]
+    primary_threshold = float(selection["validation_thresholds"]["temporal"]["B"][family])
     temporal = make_temporal_split(frame, audit["temporal_train_years"], audit["temporal_validation_years"], audit["temporal_test_years"])
 
     # Natural annual expanding windows, with selected hyperparameters and a fixed
@@ -77,7 +78,7 @@ def run_temporal_robustness() -> dict[str, pd.DataFrame]:
         sensitivity_split = make_temporal_split(
             sensitivity_frame, audit["temporal_train_years"], audit["temporal_validation_years"], audit["temporal_test_years"]
         )
-        metrics, threshold = _fit_validation_then_test(
+        metrics, _ = _fit_validation_then_test(
             sensitivity_frame, sensitivity_split, resolve_blocks(sensitivity_frame.columns)["B"],
             family, parameters, seed, n_jobs, device,
         )
@@ -90,21 +91,21 @@ def run_temporal_robustness() -> dict[str, pd.DataFrame]:
     # Optional new-year check: exclude incomplete Suffolk, train through 2023/24,
     # reuse the primary validation-derived threshold and do not retune on 2024/25.
     extended, _ = construct_cohort(include_2024_excluding_suffolk=True, save_main=False)
+    extended_columns = resolve_blocks(extended.columns)["B"]
     train_idx = extended.index[extended["FINANCIAL_YEAR"].isin(audit["main_years"])].to_numpy()
     test_idx = extended.index[extended["FINANCIAL_YEAR"].eq("2024/25")].to_numpy()
-    model = make_model_pipeline(resolve_blocks(extended.columns)["B"], family, parameters, seed, n_jobs, device)
-    model.fit(extended.loc[train_idx, columns], extended.loc[train_idx, "LARGER_FIRE"])
-    probability = model.predict_proba(extended.loc[test_idx, columns])[:, 1]
-    validation_threshold = float(selection["validation_thresholds"]["temporal"]["B"][family])
+    model = make_model_pipeline(extended_columns, family, parameters, seed, n_jobs, device)
+    model.fit(extended.loc[train_idx, extended_columns], extended.loc[train_idx, "LARGER_FIRE"])
+    probability = model.predict_proba(extended.loc[test_idx, extended_columns])[:, 1]
     metrics = classification_metrics(
-        extended.loc[test_idx, "LARGER_FIRE"].to_numpy(), probability, validation_threshold
+        extended.loc[test_idx, "LARGER_FIRE"].to_numpy(), probability, primary_threshold
     )
     sensitivity_rows.append({
         "analysis": "include_2024_25_exclude_suffolk", "test_period": "2024/25",
         "design": "temporal_new_year", "split_role": "test", "block": "B", "model": family,
         "parameters": json.dumps(parameters), **metrics,
     })
-    sensitivity = pd.DataFrame(sensitivity_rows)
+    sensitivity = add_pr_auc_prevalence_context(pd.DataFrame(sensitivity_rows))
     sensitivity.to_csv(ROOT / "outputs/tables/sensitivity_analysis_results.csv", index=False)
 
     # Random-split stability check: vary only the split assignment while holding
@@ -112,7 +113,7 @@ def run_temporal_robustness() -> dict[str, pd.DataFrame]:
     seed_rows = []
     for stability_seed in cfg["random_stability_seeds"]:
         random_split = make_random_split_like(frame, temporal, int(stability_seed))
-        metrics, threshold = _fit_validation_then_test(
+        metrics, _ = _fit_validation_then_test(
             frame, random_split, columns, family,
             selection["selected_hyperparameters"]["random"][family], seed, n_jobs, device,
         )
@@ -126,7 +127,7 @@ def run_temporal_robustness() -> dict[str, pd.DataFrame]:
     build_drift_tables(frame, temporal)
     prediction = pd.read_parquet(ROOT / "outputs/metrics/predictions_temporal_block_B.parquet")
     dev_indices = np.concatenate([temporal["train"], temporal["validation"]])
-    subgroup = subgroup_performance(frame, prediction, dev_indices, validation_threshold)
+    subgroup = subgroup_performance(frame, prediction, dev_indices, primary_threshold)
     return {
         "expanding": expanding,
         "sensitivity": sensitivity,

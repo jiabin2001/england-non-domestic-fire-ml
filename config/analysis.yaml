@@ -32,5 +32,6 @@ bootstrap_repeats: 100000
 bootstrap_seed: 20260731
 permutation_repeats: 30
 permutation_seed: 20260821
+xgboost_device: "cuda"
 n_jobs: 4
 positive_label: 1

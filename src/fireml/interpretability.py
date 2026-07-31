@@ -100,15 +100,12 @@ def grouped_permutation_importance(
             probability = np.asarray(model.predict_proba(working)[:, 1], dtype=float)
             permuted_scores[repeat] = average_precision_score(labels, probability)
         decreases = baseline_pr_auc - permuted_scores
-        lower, upper = np.quantile(decreases, [0.025, 0.975])
         rows.append({
             "feature": feature,
             "baseline_pr_auc": baseline_pr_auc,
             "mean_permuted_pr_auc": float(permuted_scores.mean()),
             "mean_pr_auc_decrease": float(decreases.mean()),
             "std_pr_auc_decrease": float(decreases.std(ddof=1)) if repeats > 1 else 0.0,
-            "permutation_p02_5": float(lower),
-            "permutation_p97_5": float(upper),
             "permutation_repeats": repeats,
             "permutation_seed": seed,
             "design": "temporal",

@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from fireml.splits import assert_disjoint, make_random_split_like, make_temporal_split
 
@@ -28,3 +29,12 @@ def test_random_matches_temporal_sizes_and_is_reproducible(cohort, audit_receipt
     assert {key: len(value) for key, value in first.items()} == {key: len(value) for key, value in temporal.items()}
     assert all(np.array_equal(first[key], second[key]) for key in first)
 
+
+def test_temporal_split_rejects_validation_year_after_test(cohort):
+    with pytest.raises(ValueError, match="strictly ordered"):
+        make_temporal_split(
+            cohort,
+            ["2010/11"],
+            ["2012/13", "2023/24"],
+            ["2022/23"],
+        )

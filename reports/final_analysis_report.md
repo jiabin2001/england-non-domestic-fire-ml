@@ -8,9 +8,9 @@ The analysis predicts incident-level final fire spread among already-recorded pr
 
 ## Data and cohort
 
-The official ODS was updated 22 July 2026. The raw-file SHA-256 is `560e5c1a18731cf8189b28471f6813675d6f95f447d680ec5603d9bb97718595`. The audit found 245,207 logical incident rows across 2010/11–2025/26. The defined main period is 2010/11–2023/24; 2024/25 is excluded because Suffolk submissions are incomplete for part of that year, and 2025/26 is excluded because it spans the IRS-to-FaRDaP transition.
+The official ODS was updated 22 July 2026. The raw-file SHA-256 is `560e5c1a18731cf8189b28471f6813675d6f95f447d680ec5603d9bb97718595`. The audit found 245,207 logical incident rows across 2010/11–2025/26. The defined main period is 2010/11–2023/24. Excluded years are 2024/25: Suffolk FRS did not submit all incidents from September 2024 to March 2025 before the data cut; 2025/26: IRS-to-FaRDaP collection transition from November 2025 may introduce a system discontinuity.
 
-After year restriction, 20 exact duplicates, 3,063 late calls and 6,081 `Roofs/ Roof spaces` target records were removed sequentially. The main cohort contains 209,171 incidents, 53,804 larger fires (25.7%).
+After year restriction, 20 exact duplicates, 3,063 late calls and 6,081 roof-space or otherwise unmappable target records were removed sequentially. The main cohort contains 209,171 incidents, 53,804 larger fires (25.7%).
 
 The main target follows the unambiguous room→floor→whole-building ordering and excludes `Roofs/ Roof spaces`, which cannot be placed uniquely on that scale. Official sources are inconsistent: the current Fire statistics definitions omit roofs from the larger-fire list, while FIRE0304-linked detailed releases include them. The roof-positive sensitivity therefore tests the alternative published convention rather than treating either source as uniquely authoritative.
 
@@ -18,7 +18,7 @@ The main target follows the unambiguous room→floor→whole-building ordering a
 
 Temporal train/validation/test years are 2010/11–2019/20, 2020/21–2021/22 and 2022/23–2023/24. The stratified random comparator has exactly the same 159,533/23,824/25,814 sample sizes. All imputing and encoding were pipeline-fitted on training data only. Compact hyperparameter and family selection used validation average precision (AP), calculated with scikit-learn's non-interpolated `average_precision_score`; analytical classification thresholds maximised validation F1. The selected train-fitted pipeline and its validation-derived threshold were then evaluated once on the corresponding holdout, with no train+validation refit or test-set retuning.
 
-Random Forest, XGBoost selected identical hyperparameters under random and temporal development designs. In particular, the primary XGBoost RQ1 contrast is not confounded by comparing different XGBoost configurations; Logistic Regression selected different regularisation strengths (`C=1.0` random versus `C=0.1` temporal).
+Random Forest and XGBoost selected identical hyperparameters under random and temporal development designs. In particular, the primary XGBoost RQ1 contrast is not confounded by comparing different XGBoost configurations; Logistic Regression selected different regularisation strengths (`C=1.0` random versus `C=0.1` temporal).
 
 The main model comparison is Block B, the retrospective incident-information model:
 
@@ -38,6 +38,18 @@ These intervals condition on the fixed splits, fitted models and selected settin
 
 All three Block B model families favoured random splitting in AP (Logistic Regression +0.011, Random Forest +0.018, XGBoost +0.016), and their ROC-AUC differences were also positive. With the estimator seed held fixed, the three random split assignments produced random-minus-temporal AP differences of +0.016, +0.018, +0.009. Together, these results support a small and directionally consistent random-split optimism effect in this retrospective Block B task. Its exact magnitude varies with the split and should not be treated as a universal or operationally important bias without a decision-specific cost analysis.
 
+The direction is not universal across information blocks, even for the same XGBoost family:
+
+| block | random_ap | temporal_ap | ap_difference | absolute_lift_difference | normalized_ap_difference | roc_auc_difference |
+|---|---|---|---|---|---|---|
+| A | 0.565 | 0.560 | 0.005 | 0.013 | 0.014 | 0.013 |
+| B | 0.657 | 0.640 | 0.016 | 0.025 | 0.027 | 0.015 |
+| C | 0.974 | 0.982 | -0.008 | -0.000 | -0.011 | -0.002 |
+
+Block A showed a smaller random advantage (+0.005); Block C reversed in raw AP (-0.008). For Block C, the absolute AP-lift difference after subtracting each holdout's prevalence was effectively zero (-0.0000), while normalized AP slightly favoured the temporal holdout (-0.011). This confines the inferentially supported positive finding to the retrospective Block B specification and shows that split effects depend on the information set. It does not by itself establish that temporal stability of any particular field caused the pattern.
+
+The expanding-window models trained on all years available before each test year achieved a sample-size-weighted mean annual AP of 0.642 in 2022/23–2023/24, compared with 0.640 for the main train-through-2019/20 model on the combined two-year holdout. The +0.001 gap suggests that training recency is not a large explanation here, but it is not a clean decomposition: the annual models use different training sets and a weighted mean of annual AP is not the pooled two-year AP.
+
 AP's no-information baseline is approximately the positive prevalence. The random and temporal XGBoost holdouts had prevalences of 0.257 and 0.265, respectively, so their AP values are interpreted with prevalence context:
 
 | design | positive_prevalence | average_precision | ap_absolute_lift | normalized_ap | roc_auc | brier_score |
@@ -53,17 +65,19 @@ XGBoost had the highest temporal Block B AP (0.640), followed by Random Forest (
 
 Grouped permutation of each original Block B field on the exact 2022/23–2023/24 temporal test set gave the following five largest mean AP decreases:
 
-| feature | mean_pr_auc_decrease | std_pr_auc_decrease | permutation_p02_5 | permutation_p97_5 |
-|---|---|---|---|---|
-| BUILDING_TYPE | 0.112 | 0.003 | 0.107 | 0.116 |
-| ITEM_IGNITED | 0.033 | 0.003 | 0.027 | 0.040 |
-| ALARM_SYSTEM | 0.031 | 0.003 | 0.026 | 0.036 |
-| FIRE_START_LOCATION | 0.027 | 0.002 | 0.023 | 0.030 |
-| IGNITION_TO_DISCOVERY | 0.021 | 0.002 | 0.017 | 0.024 |
+| feature | mean_pr_auc_decrease | std_pr_auc_decrease |
+|---|---|---|
+| BUILDING_TYPE | 0.112 | 0.003 |
+| ITEM_IGNITED | 0.033 | 0.003 |
+| ALARM_SYSTEM | 0.031 | 0.003 |
+| FIRE_START_LOCATION | 0.027 | 0.002 |
+| IGNITION_TO_DISCOVERY | 0.021 | 0.002 |
 
-The `permutation_p02_5`–`permutation_p97_5` range is the 2.5th–97.5th percentile range across 30 random permutations; it describes permutation randomness and is not a 95% confidence interval. This analysis measures the fitted model's dependence on each recorded field, not a causal effect. High importance does not mean that a variable causes greater fire spread. Correlated or overlapping fields can share importance; in particular, `CAUSE_OF_FIRE`, `SOURCE_OF_IGNITION` and `ITEM_IGNITED` may encode overlapping information. Results apply only to this fitted pipeline, feature set and temporal test set, and negative values are retained rather than truncated.
+With only 30 permutations, the table reports the mean and sample standard deviation; empirical 2.5th and 97.5th percentiles are too coarsely resolved to interpret. This analysis measures the fitted model's dependence on each recorded field, not a causal effect. High importance does not mean that a variable causes greater fire spread. Correlated or overlapping fields can share importance; in particular, `CAUSE_OF_FIRE`, `SOURCE_OF_IGNITION` and `ITEM_IGNITED` may encode overlapping information. Results apply only to this fitted pipeline, feature set and temporal test set, and negative values are retained rather than truncated.
 
 ### RQ3 — First-arrival information
+
+On the same temporal holdout, Block A's 5 structural/context fields achieved AP 0.560, an absolute lift of 0.294 above prevalence. That is 78.5% of Block B's 0.375 lift using 16 fields. This is a descriptive nested-block comparison, not an operational-utility estimate, because some Block A fields are retrospectively recorded.
 
 For validation-selected families, temporal AP rose from 0.640 in Block B to 0.982 in Block C, an absolute gain of 0.342. `FIRE_SIZE_ON_ARRIVAL` is temporally prior to final `SPREAD_OF_FIRE`, but it is a highly proximal state variable. The Block C result is therefore first-arrival prognosis, not pre-incident building risk and not evidence of deployability before crews arrive.
 
@@ -80,14 +94,16 @@ Across these 4 later-year folds, AP ranged from 0.628 to 0.687 and had the same 
 
 Expanding-window F1, precision, recall and balanced accuracy use a fixed descriptive threshold of 0.5 and are not directly comparable with the main table's validation-F1 operating point. The 2020/21–2021/22 validation window overlaps the COVID-disrupted period, and 2020/21 has the highest expanding-window prevalence (0.325); this may affect selected settings and thresholds. No policy or COVID attribution is made.
 
-| analysis | test_period | n | positive_prevalence | average_precision | roc_auc | f1 |
-|---|---|---|---|---|---|---|
-| main_temporal_definition | 2022/23-2023/24 | 25814 | 0.265 | 0.640 | 0.840 | 0.638 |
-| roofs_roof_spaces_positive | 2022/23-2023/24 | 26577 | 0.286 | 0.658 | 0.840 | 0.653 |
-| include_late_calls | 2022/23-2023/24 | 26108 | 0.263 | 0.639 | 0.840 | 0.638 |
-| include_2024_25_exclude_suffolk | 2024/25 | 12553 | 0.241 | 0.630 | 0.846 | 0.623 |
+| analysis | test_period | n | positive_prevalence | average_precision | ap_absolute_lift | normalized_ap | roc_auc | f1 |
+|---|---|---|---|---|---|---|---|---|
+| main_temporal_definition | 2022/23-2023/24 | 25814 | 0.265 | 0.640 | 0.375 | 0.510 | 0.840 | 0.638 |
+| roofs_roof_spaces_positive | 2022/23-2023/24 | 26577 | 0.286 | 0.658 | 0.371 | 0.520 | 0.840 | 0.653 |
+| include_late_calls | 2022/23-2023/24 | 26108 | 0.263 | 0.639 | 0.375 | 0.510 | 0.840 | 0.638 |
+| include_2024_25_exclude_suffolk | 2024/25 | 12553 | 0.241 | 0.630 | 0.390 | 0.513 | 0.846 | 0.623 |
 
-The alternative roof-positive convention produced temporal Block B AP 0.658. Reintroducing late calls produced 0.639, and the 2024/25 check excluding Suffolk produced 0.630. Across the three split assignments with a fixed estimator seed, random-holdout AP ranged from 0.650 to 0.659.
+Across target, cohort and new-year checks, normalized AP ranged only from 0.510 to 0.520. The roof-positive definition had higher raw AP but slightly lower absolute lift (0.371) than the main definition (0.375); it should not be read as unambiguously better performance. Across the three split assignments with a fixed estimator seed, random-holdout AP ranged from 0.650 to 0.659.
+
+Building-type subgroup AP ranged from 0.051 for Prison (prevalence 0.034) to 0.731 for Shed / Garage / Greenhouse / Summer house (0.592). At the single global validation-F1 threshold, the Prison subgroup contained 96 positives among 2,852 incidents but received no positive predictions (recall and precision both zero). This is evidence that the global analytical threshold does not transfer uniformly across prevalence-defined subgroups; it is not evidence that building type causes fire spread or that the remaining fields lack within-group signal.
 
 ## Limitations
 
@@ -98,6 +114,7 @@ The alternative roof-positive convention produced temporal Block B AP 0.658. Rei
 - Average precision is prevalence-sensitive; cross-split and subgroup comparisons require their respective positive prevalences.
 - Hyperparameters and analytical thresholds were selected using 2020/21–2021/22, a validation window that overlaps the COVID-disrupted period and includes an unusually high-prevalence first year.
 - Bootstrap intervals condition on the fixed splits, fitted models and selected settings; they do not represent repeated end-to-end model-selection uncertainty.
+- `FRS_TERRITORY` is an available pre-incident geographic field excluded by scope rather than outcome leakage; no territory-inclusive sensitivity was run, so its incremental predictive value is unknown.
 - Subgroup and permutation results are descriptive model diagnostics, not evidence of differential or variable-level causal effects.
 - Temporal performance differences do not by themselves identify why distributions changed.
 - The publisher URL can be replaced in future. Checksums verify retained files but cannot recover them; the ODS and reproducibility Parquet files require a separate durable institutional deposit.

@@ -27,6 +27,7 @@ The publisher URL is mutable: a checksum can verify a retained file but cannot r
 - Block B: retrospective incident information. Investigation and estimated-delay limitations mean this is not strictly a dispatch-time model.
 - Block C: first-arrival prognostic information. It is reported separately and cannot support pre-incident or pre-arrival risk claims.
 - Validation: a temporally ordered primary design and a target-stratified random comparator with exactly matching train/validation/test sample sizes.
+- XGBoost execution device: explicitly fixed in `config/analysis.yaml`; `auto` remains available only as a visibly warned fallback because CPU/GPU training can produce different fitted artifacts.
 - Primary metric: average precision (AP), calculated with scikit-learn's non-interpolated `average_precision_score`. Legacy `pr_auc` column and file stems retain their existing names for compatibility but store this AP value, not trapezoidal area under an interpolated precision–recall curve. Because AP's no-information baseline is approximately the positive prevalence, random–temporal comparisons are reported with prevalence context, ROC-AUC, Brier score and fixed-model bootstrap intervals. The validation-F1 threshold is an analytical operating point, not a business-optimal FRS decision rule.
 - Interpretation: original-field grouped permutation importance is reported only for the validation-selected Temporal Block B XGBoost pipeline. It measures model dependence on the fixed temporal test set, not causal effects.
 
@@ -82,7 +83,7 @@ python -m pytest -q
 - `reports/final_analysis_report.md`: results organised around RQ1–RQ3.
 - `reports/methods_receipt.md`: exact source, cohort, target, features, split, parameters, thresholds, uncertainty/interpretability settings, seeds, software and manifest.
 - `outputs/tables/bootstrap_confidence_intervals.csv`: 100,000-repeat partially paired fixed-model AP intervals; shared holdout records are resampled jointly so the observed overlap covariance is represented.
-- `outputs/tables/grouped_permutation_importance.csv`: original-field Temporal Block B model-dependence estimates; percentile columns describe random-permutation variability, not confidence intervals.
+- `outputs/tables/grouped_permutation_importance.csv`: original-field Temporal Block B model-dependence estimates, summarised by mean AP decrease and permutation sample SD. Thirty repeats are not used to infer tail percentiles.
 - `outputs/tables/pr_auc_prevalence_context.csv`: AP baseline, absolute lift and auxiliary normalized AP alongside ROC-AUC and Brier score. The legacy filename is retained for compatibility.
 - `outputs/tables/`: all requested audit, performance, stability, subgroup and sensitivity tables.
 - `outputs/figures/`: ten figures in both PNG and PDF.

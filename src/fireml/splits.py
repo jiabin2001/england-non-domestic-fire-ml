@@ -17,7 +17,10 @@ def make_temporal_split(
         "test": frame.index[frame["FINANCIAL_YEAR"].isin(test_years)].to_numpy(),
     }
     assert_disjoint(split)
-    if not (max(map(_year_start, train_years)) < min(map(_year_start, validation_years)) < min(map(_year_start, test_years))):
+    if not (
+        max(map(_year_start, train_years)) < min(map(_year_start, validation_years))
+        and max(map(_year_start, validation_years)) < min(map(_year_start, test_years))
+    ):
         raise ValueError("Temporal split years are not strictly ordered.")
     return split
 
@@ -76,4 +79,3 @@ def assignment_frame(frame: pd.DataFrame, splits: dict[str, dict[str, np.ndarray
 
 def _year_start(value: str) -> int:
     return int(value.split("/")[0])
-

@@ -4,6 +4,7 @@ import json
 import platform
 import subprocess
 import time
+import warnings
 from typing import Any
 
 import joblib
@@ -41,7 +42,27 @@ def detect_xgb_device() -> str:
         return "cpu"
 
 
-def candidate_grid(device: str) -> dict[str, list[dict[str, Any]]]:
+def resolve_xgb_device(configured: str) -> str:
+    """Resolve an explicit device, with a visible auto-detection fallback."""
+    configured = configured.lower()
+    if configured not in {"cpu", "cuda", "auto"}:
+        raise ValueError("xgboost_device must be one of: cpu, cuda, auto.")
+    if configured == "cpu":
+        return "cpu"
+    detected = detect_xgb_device()
+    if configured == "cuda" and detected != "cuda":
+        raise RuntimeError("analysis.yaml requires CUDA, but no NVIDIA GPU was detected.")
+    if configured == "auto":
+        warnings.warn(
+            f"xgboost_device=auto selected {detected}; hardware can change fitted results.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return detected
+    return configured
+
+
+def candidate_grid() -> dict[str, list[dict[str, Any]]]:
     return {
         "logistic_regression": [
             {"C": 0.1},
@@ -63,8 +84,8 @@ def candidate_grid(device: str) -> dict[str, list[dict[str, Any]]]:
     }
 
 
-def default_config(family: str, device: str) -> dict[str, Any]:
-    return candidate_grid(device)[family][1 if family == "logistic_regression" else 0]
+def default_config(family: str) -> dict[str, Any]:
+    return candidate_grid()[family][1 if family == "logistic_regression" else 0]
 
 
 def make_estimator(family: str, parameters: dict[str, Any], seed: int, n_jobs: int, device: str):
@@ -193,7 +214,7 @@ def run_core_models() -> dict[str, Any]:
     audit = json.loads((ROOT / "outputs/metrics/audit_receipt.json").read_text(encoding="utf-8"))
     blocks = resolve_blocks(frame.columns)
     seed, n_jobs = int(cfg["random_seed"]), int(cfg["n_jobs"])
-    device = detect_xgb_device()
+    device = resolve_xgb_device(str(cfg.get("xgboost_device", "auto")))
     temporal = make_temporal_split(
         frame, audit["temporal_train_years"], audit["temporal_validation_years"], audit["temporal_test_years"]
     )
@@ -205,12 +226,12 @@ def run_core_models() -> dict[str, Any]:
     baseline_rows = []
     for design, split in splits.items():
         for family in ("dummy",) + FAMILIES:
-            params = {} if family == "dummy" else default_config(family, device)
+            params = {} if family == "dummy" else default_config(family)
             _, _, metrics = _fit_validation(frame, split, blocks["B"], family, params, seed, n_jobs, device)
             baseline_rows.append({"design": design, "block": "B", "model": family, **metrics, "parameters": json.dumps(params)})
     baseline = pd.DataFrame(baseline_rows)
     baseline.to_csv(ROOT / "outputs/tables/baseline_validation_performance.csv", index=False)
-    grid = candidate_grid(device)
+    grid = candidate_grid()
     write_hyperparameter_plan(baseline, grid, device)
 
     # Formal compact selection on Block B only; no test labels are consulted.

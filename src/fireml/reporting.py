@@ -26,10 +26,30 @@ MODEL_LABELS = {
     "random_forest": "Random Forest",
     "xgboost": "XGBoost",
 }
+
+
+def _year_span(years: list[str] | pd.Series) -> str:
+    values = list(years)
+    return values[0] if len(values) == 1 else f"{values[0]}–{values[-1]}"
+
+
+def _excluded_at_stage(flow: pd.DataFrame, stage: str) -> int:
+    matches = flow.loc[flow["stage"].eq(stage), "records_excluded"]
+    if len(matches) != 1:
+        raise ValueError(f"Expected exactly one cohort-flow row for {stage!r}.")
+    return int(matches.iloc[0])
+
+
 def _save(fig: plt.Figure, stem: str) -> None:
     fig.tight_layout()
     for extension in ("png", "pdf"):
-        fig.savefig(ROOT / f"outputs/figures/{stem}.{extension}", dpi=220, bbox_inches="tight")
+        metadata = {"CreationDate": None, "ModDate": None} if extension == "pdf" else None
+        fig.savefig(
+            ROOT / f"outputs/figures/{stem}.{extension}",
+            dpi=220,
+            bbox_inches="tight",
+            metadata=metadata,
+        )
     plt.close(fig)
 
 
@@ -251,6 +271,10 @@ def _format_rows(frame: pd.DataFrame, columns: list[str], decimals: int = 3) -> 
 
 
 def _write_final_report() -> None:
+    cfg = load_yaml("config/analysis.yaml")
+    metadata = json.loads((ROOT / "data/raw/source_metadata.json").read_text(encoding="utf-8"))
+    audit = json.loads((ROOT / "outputs/metrics/audit_receipt.json").read_text(encoding="utf-8"))
+    cohort = json.loads((ROOT / "outputs/metrics/cohort_receipt.json").read_text(encoding="utf-8"))
     temporal = pd.read_csv(ROOT / "outputs/tables/temporal_validation_performance.csv")
     random = pd.read_csv(ROOT / "outputs/tables/random_validation_performance.csv")
     block = pd.read_csv(ROOT / "outputs/tables/block_comparison.csv")
@@ -260,14 +284,18 @@ def _write_final_report() -> None:
     bootstrap = pd.read_csv(ROOT / "outputs/tables/bootstrap_confidence_intervals.csv")
     prevalence_context = pd.read_csv(ROOT / "outputs/tables/pr_auc_prevalence_context.csv")
     importance = pd.read_csv(ROOT / "outputs/tables/grouped_permutation_importance.csv")
-    cohort = json.loads((ROOT / "outputs/metrics/cohort_receipt.json").read_text(encoding="utf-8"))
+    subgroup = pd.read_csv(ROOT / "outputs/tables/building_type_subgroup_performance.csv")
+    flow = pd.read_csv(ROOT / "outputs/tables/cohort_flow.csv")
+    year_coverage = pd.read_csv(ROOT / "outputs/tables/year_coverage.csv")
+    assignments = pd.read_csv(ROOT / "outputs/tables/split_assignments.csv")
     selection = json.loads((ROOT / "outputs/metrics/model_selection.json").read_text(encoding="utf-8"))
     shared_configuration_families = [
         family for family in ("logistic_regression", "random_forest", "xgboost")
         if selection["selected_hyperparameters"]["temporal"][family]
         == selection["selected_hyperparameters"]["random"][family]
     ]
-    shared_configuration_text = ", ".join(MODEL_LABELS[family] for family in shared_configuration_families)
+    shared_configuration_labels = [MODEL_LABELS[family] for family in shared_configuration_families]
+    shared_configuration_text = " and ".join(shared_configuration_labels)
     main_models = temporal[(temporal.block == "B") & (temporal.model != "dummy")].sort_values("pr_auc", ascending=False)
     core_family = selection["selected_family_by_block"]["temporal"]["B"]
     temporal_core = temporal[(temporal.block == "B") & (temporal.model == core_family)].iloc[0]
@@ -310,6 +338,58 @@ def _write_final_report() -> None:
     stability_differences = stability["pr_auc"] - float(temporal_core.pr_auc)
     stability_difference_text = ", ".join(f"{value:+.3f}" for value in stability_differences)
     stability_difference_range = float(stability_differences.max() - stability_differences.min())
+    cross_block_rows = []
+    for block_name in ("A", "B", "C"):
+        random_row = random[(random.block == block_name) & (random.model == core_family)].iloc[0]
+        temporal_row = temporal[(temporal.block == block_name) & (temporal.model == core_family)].iloc[0]
+        random_lift = random_row.pr_auc - random_row.positive_prevalence
+        temporal_lift = temporal_row.pr_auc - temporal_row.positive_prevalence
+        random_normalized = random_lift / (1.0 - random_row.positive_prevalence)
+        temporal_normalized = temporal_lift / (1.0 - temporal_row.positive_prevalence)
+        cross_block_rows.append({
+            "block": block_name,
+            "random_ap": random_row.pr_auc,
+            "temporal_ap": temporal_row.pr_auc,
+            "ap_difference": random_row.pr_auc - temporal_row.pr_auc,
+            "absolute_lift_difference": random_lift - temporal_lift,
+            "normalized_ap_difference": random_normalized - temporal_normalized,
+            "roc_auc_difference": random_row.roc_auc - temporal_row.roc_auc,
+        })
+    cross_block = pd.DataFrame(cross_block_rows).set_index("block")
+    block_a_lift = (
+        selected_temporal.loc["A", "pr_auc"]
+        - selected_temporal.loc["A", "positive_prevalence"]
+    )
+    block_b_lift = (
+        selected_temporal.loc["B", "pr_auc"]
+        - selected_temporal.loc["B", "positive_prevalence"]
+    )
+    block_a_lift_share = block_a_lift / block_b_lift
+    sensitivity_context = sensitivity.copy()
+    sensitivity_context["ap_absolute_lift"] = (
+        sensitivity_context["pr_auc"] - sensitivity_context["positive_prevalence"]
+    )
+    sensitivity_context["normalized_ap"] = sensitivity_context["ap_absolute_lift"] / (
+        1.0 - sensitivity_context["positive_prevalence"]
+    )
+    recent_expanding = expanding[
+        expanding["test_year"].isin(audit["temporal_test_years"])
+    ]
+    recent_weighted_ap = float(np.average(recent_expanding.pr_auc, weights=recent_expanding.n))
+    official_update = pd.Timestamp(metadata["official_page_updated"])
+    official_update_text = f"{official_update.day} {official_update.strftime('%B %Y')}"
+    excluded_year_text = "; ".join(
+        f"{year}: {reason.rstrip('.')}"
+        for year, reason in cfg["excluded_main_years"].items()
+    )
+    split_sizes = assignments.groupby(["design", "partition"]).size()
+    random_split_sizes = "/".join(
+        f"{int(split_sizes.loc[('random', part)]):,}"
+        for part in ("train", "validation", "test")
+    )
+    subgroup_low = subgroup.loc[subgroup.pr_auc.idxmin()]
+    subgroup_high = subgroup.loc[subgroup.pr_auc.idxmax()]
+    prison = subgroup[subgroup.building_type.eq("Prison")].iloc[0]
     report = f"""# Final analysis report
 
 ## Study definition
@@ -320,15 +400,15 @@ The analysis predicts incident-level final fire spread among already-recorded pr
 
 ## Data and cohort
 
-The official ODS was updated 22 July 2026. The raw-file SHA-256 is `560e5c1a18731cf8189b28471f6813675d6f95f447d680ec5603d9bb97718595`. The audit found 245,207 logical incident rows across 2010/11–2025/26. The defined main period is 2010/11–2023/24; 2024/25 is excluded because Suffolk submissions are incomplete for part of that year, and 2025/26 is excluded because it spans the IRS-to-FaRDaP transition.
+The official ODS was updated {official_update_text}. The raw-file SHA-256 is `{metadata['sha256']}`. The audit found {audit['logical_rows']:,} logical incident rows across {_year_span(year_coverage['financial_year'])}. The defined main period is {_year_span(audit['main_years'])}. Excluded years are {excluded_year_text}.
 
-After year restriction, 20 exact duplicates, 3,063 late calls and 6,081 `Roofs/ Roof spaces` target records were removed sequentially. The main cohort contains {cohort['rows']:,} incidents, {cohort['positive_count']:,} larger fires ({cohort['positive_prevalence']:.1%}).
+After year restriction, {_excluded_at_stage(flow, 'Remove exact duplicates'):,} exact duplicates, {_excluded_at_stage(flow, 'Exclude late calls'):,} late calls and {_excluded_at_stage(flow, 'Apply binary target mapping'):,} roof-space or otherwise unmappable target records were removed sequentially. The main cohort contains {cohort['rows']:,} incidents, {cohort['positive_count']:,} larger fires ({cohort['positive_prevalence']:.1%}).
 
 The main target follows the unambiguous room→floor→whole-building ordering and excludes `Roofs/ Roof spaces`, which cannot be placed uniquely on that scale. Official sources are inconsistent: the current Fire statistics definitions omit roofs from the larger-fire list, while FIRE0304-linked detailed releases include them. The roof-positive sensitivity therefore tests the alternative published convention rather than treating either source as uniquely authoritative.
 
 ## Validation and modelling
 
-Temporal train/validation/test years are 2010/11–2019/20, 2020/21–2021/22 and 2022/23–2023/24. The stratified random comparator has exactly the same 159,533/23,824/25,814 sample sizes. All imputing and encoding were pipeline-fitted on training data only. Compact hyperparameter and family selection used validation average precision (AP), calculated with scikit-learn's non-interpolated `average_precision_score`; analytical classification thresholds maximised validation F1. The selected train-fitted pipeline and its validation-derived threshold were then evaluated once on the corresponding holdout, with no train+validation refit or test-set retuning.
+Temporal train/validation/test years are {_year_span(audit['temporal_train_years'])}, {_year_span(audit['temporal_validation_years'])} and {_year_span(audit['temporal_test_years'])}. The stratified random comparator has exactly the same {random_split_sizes} sample sizes. All imputing and encoding were pipeline-fitted on training data only. Compact hyperparameter and family selection used validation average precision (AP), calculated with scikit-learn's non-interpolated `average_precision_score`; analytical classification thresholds maximised validation F1. The selected train-fitted pipeline and its validation-derived threshold were then evaluated once on the corresponding holdout, with no train+validation refit or test-set retuning.
 
 {shared_configuration_text} selected identical hyperparameters under random and temporal development designs. In particular, the primary XGBoost RQ1 contrast is not confounded by comparing different XGBoost configurations; Logistic Regression selected different regularisation strengths (`C=1.0` random versus `C=0.1` temporal).
 
@@ -346,6 +426,14 @@ These intervals condition on the fixed splits, fitted models and selected settin
 
 All three Block B model families favoured random splitting in AP ({family_difference_text}), and their ROC-AUC differences were also positive. With the estimator seed held fixed, the three random split assignments produced random-minus-temporal AP differences of {stability_difference_text}. Together, these results support a small and directionally consistent random-split optimism effect in this retrospective Block B task. Its exact magnitude varies with the split and should not be treated as a universal or operationally important bias without a decision-specific cost analysis.
 
+The direction is not universal across information blocks, even for the same XGBoost family:
+
+{_format_rows(cross_block.reset_index(), ['block','random_ap','temporal_ap','ap_difference','absolute_lift_difference','normalized_ap_difference','roc_auc_difference'])}
+
+Block A showed a smaller random advantage ({cross_block.loc['A','ap_difference']:+.3f}); Block C reversed in raw AP ({cross_block.loc['C','ap_difference']:+.3f}). For Block C, the absolute AP-lift difference after subtracting each holdout's prevalence was effectively zero ({cross_block.loc['C','absolute_lift_difference']:+.4f}), while normalized AP slightly favoured the temporal holdout ({cross_block.loc['C','normalized_ap_difference']:+.3f}). This confines the inferentially supported positive finding to the retrospective Block B specification and shows that split effects depend on the information set. It does not by itself establish that temporal stability of any particular field caused the pattern.
+
+The expanding-window models trained on all years available before each test year achieved a sample-size-weighted mean annual AP of {recent_weighted_ap:.3f} in {_year_span(audit['temporal_test_years'])}, compared with {temporal_core.pr_auc:.3f} for the main train-through-{audit['temporal_train_years'][-1]} model on the combined two-year holdout. The {recent_weighted_ap - temporal_core.pr_auc:+.3f} gap suggests that training recency is not a large explanation here, but it is not a clean decomposition: the annual models use different training sets and a weighted mean of annual AP is not the pooled two-year AP.
+
 AP's no-information baseline is approximately the positive prevalence. The random and temporal XGBoost holdouts had prevalences of {random_core.positive_prevalence:.3f} and {temporal_core.positive_prevalence:.3f}, respectively, so their AP values are interpreted with prevalence context:
 
 {_format_rows(context_core.rename(columns={'pr_auc': 'average_precision', 'pr_auc_absolute_lift': 'ap_absolute_lift', 'normalized_pr_auc': 'normalized_ap'}), ['design','positive_prevalence','average_precision','ap_absolute_lift','normalized_ap','roc_auc','brier_score'])}
@@ -358,11 +446,13 @@ XGBoost had the highest temporal Block B AP ({temporal_core.pr_auc:.3f}), follow
 
 Grouped permutation of each original Block B field on the exact 2022/23–2023/24 temporal test set gave the following five largest mean AP decreases:
 
-{_format_rows(importance_top, ['feature','mean_pr_auc_decrease','std_pr_auc_decrease','permutation_p02_5','permutation_p97_5'])}
+{_format_rows(importance_top, ['feature','mean_pr_auc_decrease','std_pr_auc_decrease'])}
 
-The `permutation_p02_5`–`permutation_p97_5` range is the 2.5th–97.5th percentile range across 30 random permutations; it describes permutation randomness and is not a 95% confidence interval. This analysis measures the fitted model's dependence on each recorded field, not a causal effect. High importance does not mean that a variable causes greater fire spread. Correlated or overlapping fields can share importance; in particular, `CAUSE_OF_FIRE`, `SOURCE_OF_IGNITION` and `ITEM_IGNITED` may encode overlapping information. Results apply only to this fitted pipeline, feature set and temporal test set, and negative values are retained rather than truncated.
+With only {int(importance.permutation_repeats.iloc[0])} permutations, the table reports the mean and sample standard deviation; empirical 2.5th and 97.5th percentiles are too coarsely resolved to interpret. This analysis measures the fitted model's dependence on each recorded field, not a causal effect. High importance does not mean that a variable causes greater fire spread. Correlated or overlapping fields can share importance; in particular, `CAUSE_OF_FIRE`, `SOURCE_OF_IGNITION` and `ITEM_IGNITED` may encode overlapping information. Results apply only to this fitted pipeline, feature set and temporal test set, and negative values are retained rather than truncated.
 
 ### RQ3 — First-arrival information
+
+On the same temporal holdout, Block A's {len(audit['feature_blocks']['A'])} structural/context fields achieved AP {selected_temporal.loc['A','pr_auc']:.3f}, an absolute lift of {block_a_lift:.3f} above prevalence. That is {block_a_lift_share:.1%} of Block B's {block_b_lift:.3f} lift using {len(audit['feature_blocks']['B'])} fields. This is a descriptive nested-block comparison, not an operational-utility estimate, because some Block A fields are retrospectively recorded.
 
 For validation-selected families, temporal AP rose from {selected_temporal.loc['B','pr_auc']:.3f} in Block B to {selected_temporal.loc['C','pr_auc']:.3f} in Block C, an absolute gain of {rq3_gain:.3f}. `FIRE_SIZE_ON_ARRIVAL` is temporally prior to final `SPREAD_OF_FIRE`, but it is a highly proximal state variable. The Block C result is therefore first-arrival prognosis, not pre-incident building risk and not evidence of deployability before crews arrive.
 
@@ -374,9 +464,11 @@ Across these {len(expanding)} later-year folds, AP ranged from {expanding.pr_auc
 
 Expanding-window F1, precision, recall and balanced accuracy use a fixed descriptive threshold of 0.5 and are not directly comparable with the main table's validation-F1 operating point. The 2020/21–2021/22 validation window overlaps the COVID-disrupted period, and 2020/21 has the highest expanding-window prevalence ({expanding.iloc[0].positive_prevalence:.3f}); this may affect selected settings and thresholds. No policy or COVID attribution is made.
 
-{_format_rows(sensitivity[['analysis','test_period','n','positive_prevalence','pr_auc','roc_auc','f1']].rename(columns={'pr_auc': 'average_precision'}), ['analysis','test_period','n','positive_prevalence','average_precision','roc_auc','f1'])}
+{_format_rows(sensitivity_context[['analysis','test_period','n','positive_prevalence','pr_auc','ap_absolute_lift','normalized_ap','roc_auc','f1']].rename(columns={'pr_auc': 'average_precision'}), ['analysis','test_period','n','positive_prevalence','average_precision','ap_absolute_lift','normalized_ap','roc_auc','f1'])}
 
-The alternative roof-positive convention produced temporal Block B AP {sensitivity.loc[sensitivity.analysis == 'roofs_roof_spaces_positive','pr_auc'].iloc[0]:.3f}. Reintroducing late calls produced {sensitivity.loc[sensitivity.analysis == 'include_late_calls','pr_auc'].iloc[0]:.3f}, and the 2024/25 check excluding Suffolk produced {sensitivity.loc[sensitivity.analysis == 'include_2024_25_exclude_suffolk','pr_auc'].iloc[0]:.3f}. Across the three split assignments with a fixed estimator seed, random-holdout AP ranged from {stability.pr_auc.min():.3f} to {stability.pr_auc.max():.3f}.
+Across target, cohort and new-year checks, normalized AP ranged only from {sensitivity_context.normalized_ap.min():.3f} to {sensitivity_context.normalized_ap.max():.3f}. The roof-positive definition had higher raw AP but slightly lower absolute lift ({sensitivity_context.loc[sensitivity_context.analysis == 'roofs_roof_spaces_positive','ap_absolute_lift'].iloc[0]:.3f}) than the main definition ({sensitivity_context.loc[sensitivity_context.analysis == 'main_temporal_definition','ap_absolute_lift'].iloc[0]:.3f}); it should not be read as unambiguously better performance. Across the three split assignments with a fixed estimator seed, random-holdout AP ranged from {stability.pr_auc.min():.3f} to {stability.pr_auc.max():.3f}.
+
+Building-type subgroup AP ranged from {subgroup_low.pr_auc:.3f} for {subgroup_low.building_type} (prevalence {subgroup_low.positive_prevalence:.3f}) to {subgroup_high.pr_auc:.3f} for {subgroup_high.building_type} ({subgroup_high.positive_prevalence:.3f}). At the single global validation-F1 threshold, the Prison subgroup contained {int(prison.positive_count)} positives among {int(prison.n):,} incidents but received no positive predictions (recall and precision both zero). This is evidence that the global analytical threshold does not transfer uniformly across prevalence-defined subgroups; it is not evidence that building type causes fire spread or that the remaining fields lack within-group signal.
 
 ## Limitations
 
@@ -387,6 +479,7 @@ The alternative roof-positive convention produced temporal Block B AP {sensitivi
 - Average precision is prevalence-sensitive; cross-split and subgroup comparisons require their respective positive prevalences.
 - Hyperparameters and analytical thresholds were selected using 2020/21–2021/22, a validation window that overlaps the COVID-disrupted period and includes an unusually high-prevalence first year.
 - Bootstrap intervals condition on the fixed splits, fitted models and selected settings; they do not represent repeated end-to-end model-selection uncertainty.
+- `FRS_TERRITORY` is an available pre-incident geographic field excluded by scope rather than outcome leakage; no territory-inclusive sensitivity was run, so its incremental predictive value is unknown.
 - Subgroup and permutation results are descriptive model diagnostics, not evidence of differential or variable-level causal effects.
 - Temporal performance differences do not by themselves identify why distributions changed.
 - The publisher URL can be replaced in future. Checksums verify retained files but cannot recover them; the ODS and reproducibility Parquet files require a separate durable institutional deposit.
@@ -462,6 +555,7 @@ def _write_methods_receipt() -> None:
 - `RESPONSE_TIME` is used; its redundant code field is not used.
 - Leakage blacklist: `{policy['leakage_blacklist']}`
 - Always excluded from predictors: `{policy['always_excluded']}` plus `E_CODE_TERRITORY`.
+- `FRS_TERRITORY` is excluded as a scope/geographic-generalisation decision, not classified as outcome leakage; no territory-inclusive sensitivity was estimated in this run.
 
 ## Validation
 
@@ -483,7 +577,7 @@ def _write_methods_receipt() -> None:
 - Families with identical random and temporal selected hyperparameters: `{shared_configuration_families}`. This includes Random Forest and the primary XGBoost comparator; Logistic Regression differs (`C=1.0` random, `C=0.1` temporal).
 - Validation-selected family by block: `{json.dumps(selection['selected_family_by_block'])}`
 - Validation thresholds: `{json.dumps(selection['validation_thresholds'])}`
-- XGBoost device: `{selection['xgboost_device']}`; tree method: `hist`.
+- XGBoost device: `{selection['xgboost_device']}`; tree method: `hist`. The configured device is `{cfg['xgboost_device']}` and must match the recorded selection for a result-reproducing rerun.
 
 ## Fixed-model uncertainty and prevalence context
 
@@ -491,6 +585,7 @@ def _write_methods_receipt() -> None:
 - Random and temporal test sets overlap by {int(overlap.overlap_n):,} records ({overlap.overlap_fraction_random_test:.6%} of random test and {overlap.overlap_fraction_temporal_test:.6%} of temporal test), based on `SOURCE_ROW_ID` and cross-checked against cohort index.
 - Shared records are resampled jointly in both holdouts; random-only and temporal-only records are resampled independently. Outcome class and observed overlap membership counts remain fixed.
 - Percentile limits are the 2.5th and 97.5th percentiles. They condition on fixed splits, fitted models and selected settings; repeated end-to-end selection is outside their scope.
+- The repeat count controls Monte Carlo error in these fixed-model percentile limits; it does not address split-assignment or model-selection uncertainty.
 - With estimator seed {cfg['random_seed']} fixed, split seeds {cfg['random_stability_seeds']} give random-minus-temporal AP differences of {', '.join(f'{value:+.3f}' for value in stability_differences)} (range {stability_difference_range:.3f}).
 - AP baseline, absolute lift and normalized AP are prevalence-context diagnostics. Normalized AP is auxiliary and does not replace the primary AP definition.
 
@@ -499,7 +594,7 @@ def _write_methods_receipt() -> None:
 - The validation-selected Temporal Block B XGBoost pipeline is evaluated on the exact saved 2022/23–2023/24 test indices.
 - Each of the 16 original Block B fields is permuted as a whole before the complete fitted preprocessing-and-model pipeline. This automatically groups all one-hot columns derived from that field.
 - Each field uses {cfg['permutation_repeats']} repeats with seed {cfg['permutation_seed']}; importance is baseline AP minus permuted AP, with negative values retained.
-- `permutation_p02_5` and `permutation_p97_5` are the 2.5th and 97.5th percentiles across random permutations. They describe permutation variability and are not confidence-interval limits.
+- Because {cfg['permutation_repeats']} repeats do not resolve tail quantiles well, permutation variability is summarised by the sample standard deviation rather than empirical 2.5th/97.5th percentiles.
 - Importance measures model dependence, not a causal effect, and may be shared across correlated or overlapping fields.
 
 ## Software
