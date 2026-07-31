@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Temporally validated prediction of fire spread in England's Other Building Fires Dataset"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+  "catboost==1.2.10",
   "joblib==1.5.3",
   "matplotlib==3.11.1",
   "numpy==2.5.1",
@@ -32,4 +33,3 @@ where = ["src"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
-

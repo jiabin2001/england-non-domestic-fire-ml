@@ -7,11 +7,13 @@ import time
 import warnings
 from typing import Any
 
+import catboost
 import joblib
 import numpy as np
 import pandas as pd
 import sklearn
 import xgboost
+from catboost import CatBoostClassifier
 from sklearn.dummy import DummyClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -21,11 +23,11 @@ from xgboost import XGBClassifier
 from .config import ROOT, ensure_output_dirs, load_yaml
 from .evaluation import choose_f1_threshold, classification_metrics
 from .features import assert_no_leakage, resolve_blocks
-from .preprocessing import make_preprocessor
+from .preprocessing import make_catboost_preprocessor, make_preprocessor
 from .splits import assignment_frame, make_random_split_like, make_temporal_split
 
 
-FAMILIES = ("logistic_regression", "random_forest", "xgboost")
+FAMILIES = ("logistic_regression", "random_forest", "xgboost", "catboost")
 
 
 def detect_xgb_device() -> str:
@@ -81,6 +83,12 @@ def candidate_grid() -> dict[str, list[dict[str, Any]]]:
             {"n_estimators": 200, "learning_rate": 0.1, "max_depth": 3, "min_child_weight": 1, "subsample": 1.0, "colsample_bytree": 1.0},
             {"n_estimators": 200, "learning_rate": 0.1, "max_depth": 6, "min_child_weight": 5, "subsample": 0.8, "colsample_bytree": 0.8},
         ],
+        "catboost": [
+            {"iterations": 100, "learning_rate": 0.1, "depth": 6, "l2_leaf_reg": 3.0},
+            {"iterations": 300, "learning_rate": 0.05, "depth": 6, "l2_leaf_reg": 3.0},
+            {"iterations": 200, "learning_rate": 0.1, "depth": 4, "l2_leaf_reg": 3.0},
+            {"iterations": 200, "learning_rate": 0.1, "depth": 6, "l2_leaf_reg": 10.0},
+        ],
     }
 
 
@@ -110,14 +118,33 @@ def make_estimator(family: str, parameters: dict[str, Any], seed: int, n_jobs: i
             random_state=seed,
             n_jobs=n_jobs,
         )
+    if family == "catboost":
+        return CatBoostClassifier(
+            **parameters,
+            cat_features=None,
+            loss_function="Logloss",
+            random_seed=seed,
+            thread_count=n_jobs,
+            task_type="CPU",
+            verbose=False,
+            allow_writing_files=False,
+        )
     raise KeyError(family)
 
 
 def make_model_pipeline(columns: list[str], family: str, parameters: dict[str, Any], seed: int, n_jobs: int, device: str) -> Pipeline:
     assert_no_leakage({"active": columns})
+    preprocessor = (
+        make_catboost_preprocessor(columns)
+        if family == "catboost"
+        else make_preprocessor(columns)
+    )
+    estimator = make_estimator(family, parameters, seed, n_jobs, device)
+    if family == "catboost":
+        estimator.set_params(cat_features=columns)
     return Pipeline([
-        ("preprocess", make_preprocessor(columns)),
-        ("model", make_estimator(family, parameters, seed, n_jobs, device)),
+        ("preprocess", preprocessor),
+        ("model", estimator),
     ])
 
 
@@ -164,7 +191,7 @@ def write_hyperparameter_plan(baseline: pd.DataFrame, grid: dict[str, list[dict[
 
 Candidate configurations are deliberately compact and are selected only by validation-set average precision, calculated with scikit-learn's `average_precision_score`. Holdout performance does not alter the candidate set. The selected configuration is a practical comparison setting, not a claim of theoretical optimality.
 
-XGBoost runtime device: `{device}` (`hist` tree method). CUDA is used only when `nvidia-smi` confirms an available GPU; otherwise execution falls back to CPU.
+XGBoost runtime device: `{device}` (`hist` tree method). CUDA is used only when `nvidia-smi` confirms an available GPU; otherwise execution falls back to CPU. CatBoost is fixed to CPU because its GPU training is non-deterministic; this keeps estimator randomness fixed during the split-assignment sensitivity analysis.
 
 ## Baseline observations
 
@@ -193,6 +220,12 @@ XGBoost runtime device: `{device}` (`hist` tree method). CUDA is used only when 
 - `min_child_weight` regularises small child nodes; 1 and 5 are compared.
 - `subsample` and `colsample_bytree` are 1.0 by default; a single 0.8/0.8 configuration checks moderate stochastic regularisation.
 - Four joint configurations keep XGBoost's search budget equal to Random Forest's and avoid a large optimisation exercise.
+
+## CatBoost
+
+- CatBoost receives the original categorical fields directly after train-safe conversion of missing values to `Missing/Unknown`; it does not receive one-hot encoded features.
+- Four joint configurations vary boosting length/shrinkage, tree depth and L2 leaf regularisation while keeping the search budget equal to Random Forest and XGBoost.
+- Training is fixed to CPU with `loss_function='Logloss'`, the common estimator seed and four threads. The validation-selection metric remains external non-interpolated average precision, exactly as for the other families.
 
 ## Candidate configurations
 
@@ -278,6 +311,8 @@ def run_core_models() -> dict[str, Any]:
         "selection_metric": "validation average precision (sklearn average_precision_score)",
         "threshold_rule": "maximum validation F1",
         "xgboost_device": device,
+        "catboost_task_type": "CPU",
+        "rq1_comparator_family": selected_by_block["temporal"]["B"],
         "selected_hyperparameters": chosen,
         "selected_family_by_block": selected_by_block,
         "validation_thresholds": {
@@ -308,6 +343,10 @@ def run_core_models() -> dict[str, Any]:
     (ROOT / "outputs/metrics/post_test_evaluation_receipt.json").unlink(missing_ok=True)
     (ROOT / "outputs/metrics/locked_model_config.json").unlink(missing_ok=True)
 
+    for pattern in ("best_*.joblib", "rq1_*.joblib"):
+        for stale_model in (ROOT / "outputs/models").glob(pattern):
+            stale_model.unlink()
+
     # Validation chooses hyperparameters, family and threshold. The test model remains
     # train-fitted so the validation-derived threshold applies to the same fitted model.
     test_rows = []
@@ -330,9 +369,15 @@ def run_core_models() -> dict[str, Any]:
                     "parameters": json.dumps(params), "fit_seconds": float(seconds), **metrics,
                 }
                 test_rows.append(row)
-                if family == selected_by_block[design][block]:
+                selected_for_design = family == selected_by_block[design][block]
+                rq1_comparator = block == "B" and family == selection["rq1_comparator_family"]
+                if selected_for_design:
                     model_path = ROOT / f"outputs/models/best_{design}_block_{block}_{family}.joblib"
                     joblib.dump(pipeline, model_path, compress=3)
+                if rq1_comparator and not selected_for_design:
+                    model_path = ROOT / f"outputs/models/rq1_{design}_block_B_{family}.joblib"
+                    joblib.dump(pipeline, model_path, compress=3)
+                if rq1_comparator or (block != "B" and selected_for_design):
                     prediction = frame.loc[split["test"], ["SOURCE_ROW_ID", "FINANCIAL_YEAR", "BUILDING_TYPE", "LARGER_FIRE"]].copy()
                     prediction["probability"] = probability
                     prediction["prediction"] = (probability >= threshold).astype("int8")
@@ -373,7 +418,9 @@ def run_core_models() -> dict[str, Any]:
         "numpy": np.__version__,
         "scikit_learn": sklearn.__version__,
         "xgboost": xgboost.__version__,
+        "catboost": catboost.__version__,
         "xgboost_device": device,
+        "catboost_task_type": "CPU",
         "n_jobs": n_jobs,
     }
     (ROOT / "outputs/metrics/runtime_environment.json").write_text(json.dumps(runtime, indent=2), encoding="utf-8")

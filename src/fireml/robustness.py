@@ -74,7 +74,10 @@ def run_random_split_stability() -> pd.DataFrame:
     selection = json.loads((ROOT / "outputs/metrics/model_selection.json").read_text(encoding="utf-8"))
     frame = pd.read_parquet(ROOT / cfg["cohort_path"])
     columns = resolve_blocks(frame.columns)["B"]
-    family = selection["selected_family_by_block"]["temporal"]["B"]
+    family = selection.get(
+        "rq1_comparator_family",
+        selection["selected_family_by_block"]["temporal"]["B"],
+    )
     estimator_seed = int(cfg["random_seed"])
     temporal = make_temporal_split(
         frame,
@@ -102,7 +105,10 @@ def run_temporal_robustness() -> dict[str, pd.DataFrame]:
     frame = pd.read_parquet(ROOT / cfg["cohort_path"])
     blocks = resolve_blocks(frame.columns)
     columns = blocks["B"]
-    family = selection["selected_family_by_block"]["temporal"]["B"]
+    family = selection.get(
+        "rq1_comparator_family",
+        selection["selected_family_by_block"]["temporal"]["B"],
+    )
     parameters = selection["selected_hyperparameters"]["temporal"][family]
     seed, n_jobs, device = int(cfg["random_seed"]), int(cfg["n_jobs"]), selection["xgboost_device"]
     primary_threshold = float(selection["validation_thresholds"]["temporal"]["B"][family])

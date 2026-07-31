@@ -22,14 +22,15 @@ The publisher URL is mutable: a checksum can verify a retained file but cannot r
 
 - Main cohort: primary other-building fires, 2010/11–2023/24, exact duplicates removed, late calls excluded, and only unambiguously mapped target categories retained.
 - Binary target: `LARGER_FIRE`, derived strictly from observed `SPREAD_OF_FIRE` strings. The main estimand uses the unambiguous room→floor→whole-building ordering and excludes `Roofs/ Roof spaces`. Official sources differ on whether roofs belong in the larger-fire grouping, so a roof-positive sensitivity tests the alternative published convention.
-- Models: prior Dummy baseline, Logistic Regression, Random Forest and XGBoost. The latter three are the only main machine-learning models.
+- Models: prior Dummy baseline, Logistic Regression, Random Forest, XGBoost and CatBoost. The latter four are the main machine-learning model families.
 - Block A: structural and context information.
 - Block B: retrospective incident information. Investigation and estimated-delay limitations mean this is not strictly a dispatch-time model.
 - Block C: first-arrival prognostic information. It is reported separately and cannot support pre-incident or pre-arrival risk claims.
 - Validation: a temporally ordered primary design and a target-stratified random comparator with exactly matching train/validation/test sample sizes.
 - XGBoost execution device: explicitly fixed in `config/analysis.yaml`; `auto` remains available only as a visibly warned fallback because CPU/GPU training can produce different fitted artifacts.
+- CatBoost execution device: fixed to CPU for deterministic seeded training. CatBoost receives the original string-valued categorical fields directly; the other main families retain the existing train-fitted sparse one-hot pipeline.
 - Primary metric: average precision (AP), calculated with scikit-learn's non-interpolated `average_precision_score`. Legacy `pr_auc` column and file stems retain their existing names for compatibility but store this AP value, not trapezoidal area under an interpolated precision–recall curve. Because AP's no-information baseline is approximately the positive prevalence, random–temporal comparisons are reported with prevalence context, ROC-AUC, Brier score and fixed-model bootstrap intervals. The validation-F1 threshold is an analytical operating point, not a business-optimal FRS decision rule.
-- Interpretation: original-field grouped permutation importance is reported only for the validation-selected Temporal Block B XGBoost pipeline. It measures model dependence on the fixed temporal test set, not causal effects.
+- Interpretation: original-field grouped permutation importance is reported only for the validation-selected Temporal Block B pipeline, whichever family wins validation selection. It measures model dependence on the fixed temporal test set, not causal effects.
 
 ## Environment
 

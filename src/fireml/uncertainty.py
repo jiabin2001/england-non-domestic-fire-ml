@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pandas as pd
 from sklearn.metrics import average_precision_score
@@ -172,6 +174,7 @@ def build_bootstrap_ci_table(
     temporal_predictions: pd.DataFrame,
     repeats: int = 100000,
     seed: int = 20260731,
+    model_label: str = "validation-selected model",
 ) -> pd.DataFrame:
     """Summarise fixed-model average-precision uncertainty for overlapping holdouts."""
     required = {"LARGER_FIRE", "probability"}
@@ -206,7 +209,7 @@ def build_bootstrap_ci_table(
             "estimand": estimand,
             "design": design,
             "block": "B",
-            "model": "validation-selected XGBoost",
+            "model": model_label,
             "point_estimate": point,
             "ci_lower_95": float(lower),
             "ci_upper_95": float(upper),
@@ -266,7 +269,7 @@ def build_pr_auc_prevalence_context(
     combined = pd.concat([random_performance, temporal_performance], ignore_index=True)
     combined = combined[
         (combined["block"] == "B")
-        & combined["model"].isin(("logistic_regression", "random_forest", "xgboost"))
+        & combined["model"].ne("dummy")
     ].copy()
     contextual = add_pr_auc_prevalence_context(combined)
     columns = [
@@ -281,6 +284,13 @@ def run_uncertainty_analysis() -> dict[str, pd.DataFrame]:
     """Generate bootstrap and prevalence-context tables from fixed test outputs."""
     ensure_output_dirs()
     cfg = load_yaml("config/analysis.yaml")
+    selection = json.loads(
+        (ROOT / "outputs/metrics/model_selection.json").read_text(encoding="utf-8")
+    )
+    family = selection.get(
+        "rq1_comparator_family",
+        selection["selected_family_by_block"]["temporal"]["B"],
+    )
     random_predictions = pd.read_parquet(
         ROOT / "outputs/metrics/predictions_random_block_B.parquet"
     )
@@ -292,6 +302,7 @@ def run_uncertainty_analysis() -> dict[str, pd.DataFrame]:
         temporal_predictions,
         repeats=int(cfg["bootstrap_repeats"]),
         seed=int(cfg["bootstrap_seed"]),
+        model_label=f"validation-selected {family}",
     )
     bootstrap.to_csv(
         ROOT / "outputs/tables/bootstrap_confidence_intervals.csv", index=False

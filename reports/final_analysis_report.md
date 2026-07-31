@@ -16,14 +16,15 @@ The main target follows the unambiguous room→floor→whole-building ordering a
 
 ## Validation and modelling
 
-Temporal train/validation/test years are 2010/11–2019/20, 2020/21–2021/22 and 2022/23–2023/24. The stratified random comparator has exactly the same 159,533/23,824/25,814 sample sizes. All imputing and encoding were pipeline-fitted on training data only. Compact hyperparameter and family selection used validation average precision (AP), calculated with scikit-learn's non-interpolated `average_precision_score`; analytical classification thresholds maximised validation F1. The selected train-fitted pipeline and its validation-derived threshold were then evaluated once on the corresponding holdout, with no train+validation refit or test-set retuning.
+Temporal train/validation/test years are 2010/11–2019/20, 2020/21–2021/22 and 2022/23–2023/24. The stratified random comparator has exactly the same 159,533/23,824/25,814 sample sizes. All preprocessing remained inside the fitted pipelines: Logistic Regression, Random Forest and XGBoost used training-fitted imputation and sparse one-hot encoding, while CatBoost received the original categorical fields after explicit missing-value conversion. Compact hyperparameter and family selection used validation average precision (AP), calculated with scikit-learn's non-interpolated `average_precision_score`; analytical classification thresholds maximised validation F1. The selected train-fitted pipeline and its validation-derived threshold were then evaluated once on the corresponding holdout, with no train+validation refit or test-set retuning.
 
-Random Forest and XGBoost selected identical hyperparameters under random and temporal development designs. Selected settings differed for Logistic Regression: random `{"C": 1.0}` versus temporal `{"C": 0.1}`. The primary XGBoost RQ1 contrast therefore uses the same selected configuration in both designs.
+Random Forest, XGBoost and CatBoost selected identical hyperparameters under random and temporal development designs. Selected settings differed for Logistic Regression: random `{"C": 1.0}` versus temporal `{"C": 0.1}`. The primary XGBoost RQ1 contrast therefore uses the same selected configuration in both designs.
 
 The main model comparison is Block B, the retrospective incident-information model:
 
 | model | n | positive_count | positive_prevalence | average_precision | roc_auc | f1 | brier_score |
 |---|---|---|---|---|---|---|---|
+| CatBoost | 25814 | 6850 | 0.265 | 0.644 | 0.839 | 0.641 | 0.136 |
 | XGBoost | 25814 | 6850 | 0.265 | 0.640 | 0.840 | 0.638 | 0.137 |
 | Random Forest | 25814 | 6850 | 0.265 | 0.634 | 0.835 | 0.632 | 0.138 |
 | Logistic Regression | 25814 | 6850 | 0.265 | 0.628 | 0.831 | 0.630 | 0.140 |
@@ -38,7 +39,7 @@ Across-assignment stability was assessed using 20 consecutive split seeds. The o
 
 The fixed-split bootstrap interval and across-split point range address different uncertainty sources. The former excludes zero only conditional on the primary splits, fitted models and selected settings; the negative minimum across the alternative assignments shows that the sign is not invariant to split assignment. Their widths were similar (approximately 0.030 and 0.029), but the quantities are dependent and neither is a joint interval or a measure of total uncertainty across test sampling and split assignment.
 
-For the primary split, all three Block B model families favoured random splitting in AP (Logistic Regression +0.011, Random Forest +0.018, XGBoost +0.016), and the corresponding ROC-AUC differences were also positive. The exact magnitude of random-split optimism varies with the split and should not be treated as universal or operationally important without a decision-specific cost analysis. The repeated splits are an empirical sensitivity analysis under fixed model settings, not a second bootstrap interval or 20 independent datasets.
+For the primary split, all 4 Block B model families favoured random splitting in AP (Logistic Regression +0.011, Random Forest +0.018, XGBoost +0.016, CatBoost +0.015), and the corresponding ROC-AUC differences were also positive. The exact magnitude of random-split optimism varies with the split and should not be treated as universal or operationally important without a decision-specific cost analysis. The repeated splits are an empirical sensitivity analysis under fixed model settings, not a second bootstrap interval or 20 independent datasets.
 
 The direction is not universal across information blocks, even for the same XGBoost family:
 
@@ -63,7 +64,7 @@ Normalized AP is an auxiliary prevalence-relative summary, not a replacement pri
 
 ### RQ2 — Best later-year model
 
-XGBoost had the highest temporal Block B AP (0.640), followed by Random Forest (0.634) and Logistic Regression (0.628). The margins are small and no pairwise model-difference interval was estimated, so XGBoost is described only as the highest-performing evaluated family.
+The observed temporal Block B test AP ranking was CatBoost (0.644), XGBoost (0.640), Random Forest (0.634) and Logistic Regression (0.628). XGBoost nevertheless remained the locked primary family because its validation AP (0.666332) exceeded CatBoost's (0.666293) by 0.000039. The higher observed test AP for CatBoost is therefore descriptive and does not trigger post-holdout model reselection; no pairwise model-difference interval was estimated.
 
 Grouped permutation of each original Block B field on the exact 2022/23–2023/24 temporal test set gave the following five largest mean AP decreases:
 
@@ -79,7 +80,7 @@ With only 30 permutations, the table reports the mean and sample standard deviat
 
 ### Structural/context information
 
-On the same temporal holdout, Block A's 5 structural/context fields achieved AP 0.560, an absolute lift of 0.294 above prevalence. That is 78.5% of Block B's 0.375 lift using 16 fields. This is a descriptive nested-block comparison, not an operational-utility estimate, because some Block A fields are retrospectively recorded.
+On the same temporal holdout, Block A's 5 structural/context fields achieved AP 0.561, an absolute lift of 0.296 above prevalence. That is 79.0% of Block B's 0.375 lift using 16 fields. This is a descriptive nested-block comparison, not an operational-utility estimate, because some Block A fields are retrospectively recorded.
 
 ### RQ3 — First-arrival information
 

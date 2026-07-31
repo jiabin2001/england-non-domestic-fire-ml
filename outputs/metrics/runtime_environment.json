@@ -5,7 +5,9 @@
   "numpy": "2.5.1",
   "scikit_learn": "1.9.0",
   "xgboost": "3.3.0",
+  "catboost": "1.2.10",
   "xgboost_device": "cuda",
+  "catboost_task_type": "CPU",
   "n_jobs": 4,
   "packages": {
     "numpy": "2.5.1",
@@ -14,6 +16,7 @@
     "odfpy": "1.4.1",
     "scikit-learn": "1.9.0",
     "xgboost": "3.3.0",
+    "catboost": "1.2.10",
     "scipy": "1.18.0",
     "matplotlib": "3.11.1",
     "joblib": "1.5.3",

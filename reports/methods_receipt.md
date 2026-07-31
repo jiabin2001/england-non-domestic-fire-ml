@@ -30,7 +30,7 @@
 - Block A — structural and context: `['DAY_OF_WEEK', 'DAY_NIGHT', 'BUILDING_TYPE', 'FSO_APPLY', 'OCCUPIED_NORMAL']`
 - Block B — retrospective incident information: `['DAY_OF_WEEK', 'DAY_NIGHT', 'BUILDING_TYPE', 'FSO_APPLY', 'OCCUPIED_NORMAL', 'OCCUPIED_TIME', 'ALARM_SYSTEM', 'SAFETY_SYSTEM', 'IGNITION_TO_DISCOVERY', 'DISCOVERY_TO_CALL', 'ACCIDENTAL_OR_DELIBERATE', 'CAUSE_OF_FIRE', 'IGNITION_POWER', 'SOURCE_OF_IGNITION', 'FIRE_START_LOCATION', 'ITEM_IGNITED']`
 - Block C — first-arrival prognostic: `['DAY_OF_WEEK', 'DAY_NIGHT', 'BUILDING_TYPE', 'FSO_APPLY', 'OCCUPIED_NORMAL', 'OCCUPIED_TIME', 'ALARM_SYSTEM', 'SAFETY_SYSTEM', 'IGNITION_TO_DISCOVERY', 'DISCOVERY_TO_CALL', 'ACCIDENTAL_OR_DELIBERATE', 'CAUSE_OF_FIRE', 'IGNITION_POWER', 'SOURCE_OF_IGNITION', 'FIRE_START_LOCATION', 'ITEM_IGNITED', 'FIRE_SIZE_ON_ARRIVAL', 'OTHER_PROPERTY_AFFECTED_ON_ARRIVAL', 'RESPONSE_TIME']`
-- All retained predictors are treated as categorical/banded fields. Missing/blank values become `Missing/Unknown`; one-hot encoding uses `handle_unknown='ignore'`. No rare-category merger was required because the largest field has 82 disclosed categories and sparse one-hot encoding remained tractable.
+- All retained predictors are treated as categorical/banded fields. Missing/blank values become `Missing/Unknown`. Logistic Regression, Random Forest and XGBoost use sparse one-hot encoding with `handle_unknown='ignore'`; CatBoost receives the original fields as native string-valued categorical features. No rare-category merger was required because the largest field has 82 disclosed categories.
 - `RESPONSE_TIME` is used; its redundant code field is not used.
 - Leakage blacklist: `['SPREAD_OF_FIRE', 'ITEM_CAUSING_SPREAD', 'RAPID_FIRE_GROWTH', 'FIRE_DAMAGE_EXTENT', 'FIRE_DAMAGE_EXTENT_CODE', 'TOTAL_DAMAGE_EXTENT', 'TOTAL_DAMAGE_EXTENT_CODE', 'OTHER_PROPERTY_AFFECTED_CLOSE', 'TIME_AT_SCENE', 'TIME_AT_SCENE_CODE', 'TIME_AT_SCENE _CODE', 'VEHICLES', 'VEHICLES_CODE', 'PERSONNEL', 'PERSONNEL_CODE', 'FATALITY_CASUALTY', 'RESCUES', 'EVACUATIONS', 'EVACUATIONS_CODE']`
 - Always excluded from predictors: `['FINANCIAL_YEAR', 'FRS_TERRITORY', 'LATE_CALL', 'LARGER_FIRE']` plus `E_CODE_TERRITORY`.
@@ -52,12 +52,14 @@
 ## Hyperparameters and thresholds
 
 - Full candidate ranges and results: `reports/hyperparameter_plan.md` and `outputs/tables/hyperparameter_search_results.csv`.
-- Selected parameters: `{"temporal": {"logistic_regression": {"C": 0.1}, "random_forest": {"n_estimators": 200, "max_depth": null, "min_samples_leaf": 5, "max_features": "sqrt"}, "xgboost": {"n_estimators": 200, "learning_rate": 0.1, "max_depth": 6, "min_child_weight": 5, "subsample": 0.8, "colsample_bytree": 0.8}}, "random": {"logistic_regression": {"C": 1.0}, "random_forest": {"n_estimators": 200, "max_depth": null, "min_samples_leaf": 5, "max_features": "sqrt"}, "xgboost": {"n_estimators": 200, "learning_rate": 0.1, "max_depth": 6, "min_child_weight": 5, "subsample": 0.8, "colsample_bytree": 0.8}}}`
-- Families with identical random and temporal selected hyperparameters: `['random_forest', 'xgboost']`.
+- Selected parameters: `{"temporal": {"logistic_regression": {"C": 0.1}, "random_forest": {"n_estimators": 200, "max_depth": null, "min_samples_leaf": 5, "max_features": "sqrt"}, "xgboost": {"n_estimators": 200, "learning_rate": 0.1, "max_depth": 6, "min_child_weight": 5, "subsample": 0.8, "colsample_bytree": 0.8}, "catboost": {"iterations": 200, "learning_rate": 0.1, "depth": 6, "l2_leaf_reg": 10.0}}, "random": {"logistic_regression": {"C": 1.0}, "random_forest": {"n_estimators": 200, "max_depth": null, "min_samples_leaf": 5, "max_features": "sqrt"}, "xgboost": {"n_estimators": 200, "learning_rate": 0.1, "max_depth": 6, "min_child_weight": 5, "subsample": 0.8, "colsample_bytree": 0.8}, "catboost": {"iterations": 200, "learning_rate": 0.1, "depth": 6, "l2_leaf_reg": 10.0}}}`
+- Families with identical random and temporal selected hyperparameters: `['random_forest', 'xgboost', 'catboost']`.
 - Families with differing selected hyperparameters, including their design-specific settings: `{"logistic_regression": {"random": {"C": 1.0}, "temporal": {"C": 0.1}}}`
-- Validation-selected family by block: `{"temporal": {"A": "xgboost", "B": "xgboost", "C": "xgboost"}, "random": {"A": "xgboost", "B": "xgboost", "C": "xgboost"}}`
-- Validation thresholds: `{"temporal": {"A": {"dummy": 0.2499106767878746, "logistic_regression": 0.2867622375488281, "random_forest": 0.2722170425235016, "xgboost": 0.33036476373672485}, "B": {"dummy": 0.2499106767878746, "logistic_regression": 0.2742215096950531, "random_forest": 0.3519588449756025, "xgboost": 0.2836891710758209}, "C": {"dummy": 0.2499106767878746, "logistic_regression": 0.5661454796791077, "random_forest": 0.4307341088371494, "xgboost": 0.3571653366088867}}, "random": {"A": {"dummy": 0.25722577773877503, "logistic_regression": 0.272072970867157, "random_forest": 0.29698505349039045, "xgboost": 0.29469117522239685}, "B": {"dummy": 0.25722577773877503, "logistic_regression": 0.30903926491737366, "random_forest": 0.3399175365666454, "xgboost": 0.34557846188545227}, "C": {"dummy": 0.25722577773877503, "logistic_regression": 0.4314391613006592, "random_forest": 0.4773128881043004, "xgboost": 0.5401079654693604}}}`
+- Validation-selected family by block: `{"temporal": {"A": "catboost", "B": "xgboost", "C": "xgboost"}, "random": {"A": "catboost", "B": "xgboost", "C": "xgboost"}}`
+- RQ1 comparator family: `xgboost` (the Temporal Block B validation-selected family, evaluated under each design's selected hyperparameters).
+- Validation thresholds: `{"temporal": {"A": {"dummy": 0.2499106767878746, "logistic_regression": 0.2867622375488281, "random_forest": 0.2722170425235016, "xgboost": 0.33036476373672485, "catboost": 0.32418457545196283}, "B": {"dummy": 0.2499106767878746, "logistic_regression": 0.2742215096950531, "random_forest": 0.3519588449756025, "xgboost": 0.2836891710758209, "catboost": 0.2815668632868977}, "C": {"dummy": 0.2499106767878746, "logistic_regression": 0.5661454796791077, "random_forest": 0.4307341088371494, "xgboost": 0.3571653366088867, "catboost": 0.4511129850752928}}, "random": {"A": {"dummy": 0.25722577773877503, "logistic_regression": 0.272072970867157, "random_forest": 0.29698505349039045, "xgboost": 0.29469117522239685, "catboost": 0.278657392446448}, "B": {"dummy": 0.25722577773877503, "logistic_regression": 0.30903926491737366, "random_forest": 0.3399175365666454, "xgboost": 0.34557846188545227, "catboost": 0.30291096019279345}, "C": {"dummy": 0.25722577773877503, "logistic_regression": 0.4314391613006592, "random_forest": 0.4773128881043004, "xgboost": 0.5401079654693604, "catboost": 0.34767621907986174}}}`
 - XGBoost device: `cuda`; tree method: `hist`. The configured device is `cuda` and must match the recorded selection for a result-reproducing rerun.
+- CatBoost task type: `CPU`. CPU is fixed for deterministic seeded training; native categorical handling is used without one-hot encoding.
 
 ## Fixed-model uncertainty and prevalence context
 
@@ -78,7 +80,7 @@
 ## Grouped permutation importance
 
 - The validation-selected Temporal Block B XGBoost pipeline is evaluated on the exact saved 2022/23–2023/24 test indices.
-- Each of the 16 original Block B fields is permuted as a whole before the complete fitted preprocessing-and-model pipeline. This automatically groups all one-hot columns derived from that field.
+- Each of the 16 original Block B fields is permuted as a whole before the complete fitted preprocessing-and-model pipeline. For one-hot models this automatically groups all derived indicator columns; for CatBoost it permutes the native categorical field directly.
 - Each field uses 30 repeats with seed 20260821; importance is baseline AP minus permuted AP, with negative values retained.
 - Because 30 repeats do not resolve tail quantiles well, permutation variability is summarised by the sample standard deviation rather than empirical 2.5th/97.5th percentiles.
 - Importance measures model dependence, not a causal effect, and may be shared across correlated or overlapping fields.
@@ -93,7 +95,9 @@
   "numpy": "2.5.1",
   "scikit_learn": "1.9.0",
   "xgboost": "3.3.0",
+  "catboost": "1.2.10",
   "xgboost_device": "cuda",
+  "catboost_task_type": "CPU",
   "n_jobs": 4,
   "packages": {
     "numpy": "2.5.1",
@@ -102,6 +106,7 @@
     "odfpy": "1.4.1",
     "scikit-learn": "1.9.0",
     "xgboost": "3.3.0",
+    "catboost": "1.2.10",
     "scipy": "1.18.0",
     "matplotlib": "3.11.1",
     "joblib": "1.5.3",
@@ -145,10 +150,10 @@
 - `outputs/metrics/predictions_temporal_block_B.parquet`
 - `outputs/metrics/predictions_temporal_block_C.parquet`
 - `outputs/metrics/runtime_environment.json`
-- `outputs/models/best_random_block_A_xgboost.joblib`
+- `outputs/models/best_random_block_A_catboost.joblib`
 - `outputs/models/best_random_block_B_xgboost.joblib`
 - `outputs/models/best_random_block_C_xgboost.joblib`
-- `outputs/models/best_temporal_block_A_xgboost.joblib`
+- `outputs/models/best_temporal_block_A_catboost.joblib`
 - `outputs/models/best_temporal_block_B_xgboost.joblib`
 - `outputs/models/best_temporal_block_C_xgboost.joblib`
 - `outputs/tables/annual_incident_prevalence.csv`

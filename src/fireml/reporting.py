@@ -25,7 +25,9 @@ MODEL_LABELS = {
     "logistic_regression": "Logistic Regression",
     "random_forest": "Random Forest",
     "xgboost": "XGBoost",
+    "catboost": "CatBoost",
 }
+MODEL_FAMILIES = ("logistic_regression", "random_forest", "xgboost", "catboost")
 
 
 def _year_span(years: list[str] | pd.Series) -> str:
@@ -143,6 +145,7 @@ def _random_temporal_figure() -> None:
 
 def _expanding_figure() -> None:
     data = pd.read_csv(ROOT / "outputs/tables/expanding_window_performance.csv")
+    model_label = MODEL_LABELS[data["model"].iloc[0]]
     fig, axes = plt.subplots(1, 2, figsize=(11, 4.8))
     axes[0].plot(data.test_year, data.pr_auc, marker="o", color="#4c78a8", label="Average precision")
     axes[0].plot(data.test_year, data.pr_auc_baseline, marker="s", color="#a43c3c", label="Positive prevalence")
@@ -155,7 +158,7 @@ def _expanding_figure() -> None:
     for ax in axes:
         ax.set_xlabel("One-year temporal test")
         ax.legend(frameon=False)
-    fig.suptitle("Expanding-window annual performance: fixed Block B XGBoost settings")
+    fig.suptitle(f"Expanding-window annual performance: fixed Block B {model_label} settings")
     _save(fig, "04_expanding_window_performance")
 
 
@@ -193,7 +196,7 @@ def _confusion_and_calibration() -> None:
     calibration = pd.DataFrame({"mean_predicted_probability": predicted, "observed_fraction_positive": observed})
     calibration.to_csv(ROOT / "outputs/tables/best_temporal_calibration_curve.csv", index=False)
     fig, ax = plt.subplots(figsize=(5.5, 4.8)); ax.plot([0,1],[0,1], linestyle="--", color="#666666", label="Ideal")
-    ax.plot(predicted, observed, marker="o", color="#4c78a8", label="Block B XGBoost")
+    ax.plot(predicted, observed, marker="o", color="#4c78a8", label=f"Block B {MODEL_LABELS[family]}")
     ax.set_xlabel("Mean predicted probability"); ax.set_ylabel("Observed positive fraction"); ax.set_xlim(0,1); ax.set_ylim(0,1)
     ax.set_title("Temporal Block B calibration"); ax.legend(frameon=False)
     _save(fig, "07_best_temporal_calibration")
@@ -318,7 +321,10 @@ def _write_random_stability_summary() -> pd.Series:
     selection = json.loads(
         (ROOT / "outputs/metrics/model_selection.json").read_text(encoding="utf-8")
     )
-    family = selection["selected_family_by_block"]["temporal"]["B"]
+    family = selection.get(
+        "rq1_comparator_family",
+        selection["selected_family_by_block"]["temporal"]["B"],
+    )
     temporal = pd.read_csv(ROOT / "outputs/tables/temporal_validation_performance.csv")
     temporal_ap = temporal[
         temporal["block"].eq("B") & temporal["model"].eq(family)
@@ -341,6 +347,7 @@ def _write_final_report(stability_summary: pd.Series) -> None:
     cohort = json.loads((ROOT / "outputs/metrics/cohort_receipt.json").read_text(encoding="utf-8"))
     temporal = pd.read_csv(ROOT / "outputs/tables/temporal_validation_performance.csv")
     random = pd.read_csv(ROOT / "outputs/tables/random_validation_performance.csv")
+    development = pd.read_csv(ROOT / "outputs/tables/development_validation_performance.csv")
     block = pd.read_csv(ROOT / "outputs/tables/block_comparison.csv")
     expanding = pd.read_csv(ROOT / "outputs/tables/expanding_window_performance.csv")
     sensitivity = pd.read_csv(ROOT / "outputs/tables/sensitivity_analysis_results.csv")
@@ -353,12 +360,12 @@ def _write_final_report(stability_summary: pd.Series) -> None:
     assignments = pd.read_csv(ROOT / "outputs/tables/split_assignments.csv")
     selection = json.loads((ROOT / "outputs/metrics/model_selection.json").read_text(encoding="utf-8"))
     shared_configuration_families = [
-        family for family in ("logistic_regression", "random_forest", "xgboost")
+        family for family in MODEL_FAMILIES
         if selection["selected_hyperparameters"]["temporal"][family]
         == selection["selected_hyperparameters"]["random"][family]
     ]
     differing_configuration_families = [
-        family for family in ("logistic_regression", "random_forest", "xgboost")
+        family for family in MODEL_FAMILIES
         if family not in shared_configuration_families
     ]
     if shared_configuration_families:
@@ -385,7 +392,10 @@ def _write_final_report(stability_summary: pd.Series) -> None:
     else:
         differing_configuration_sentence = "No selected settings differed between the two designs."
     main_models = temporal[(temporal.block == "B") & (temporal.model != "dummy")].sort_values("pr_auc", ascending=False)
-    core_family = selection["selected_family_by_block"]["temporal"]["B"]
+    core_family = selection.get(
+        "rq1_comparator_family",
+        selection["selected_family_by_block"]["temporal"]["B"],
+    )
     if (
         selection["selected_hyperparameters"]["temporal"][core_family]
         == selection["selected_hyperparameters"]["random"][core_family]
@@ -438,10 +448,11 @@ def _write_final_report(stability_summary: pd.Series) -> None:
         f"{MODEL_LABELS[row.model]} {row.ap_difference:+.3f}"
         for row in family_comparison.itertuples(index=False)
     )
+    family_count = len(family_comparison)
     if family_comparison["ap_difference"].gt(0).all():
-        family_ap_direction_text = "All three Block B model families favoured random splitting in AP"
+        family_ap_direction_text = f"All {family_count} Block B model families favoured random splitting in AP"
     elif family_comparison["ap_difference"].lt(0).all():
-        family_ap_direction_text = "All three Block B model families favoured temporal splitting in AP"
+        family_ap_direction_text = f"All {family_count} Block B model families favoured temporal splitting in AP"
     else:
         family_ap_direction_text = "The Block B model-family AP differences were mixed in direction"
     primary_split_family_ap_text = (
@@ -487,6 +498,7 @@ def _write_final_report(stability_summary: pd.Series) -> None:
         temporal_normalized = temporal_lift / (1.0 - temporal_row.positive_prevalence)
         cross_block_rows.append({
             "block": block_name,
+            "model": core_family,
             "random_ap": random_row.pr_auc,
             "temporal_ap": temporal_row.pr_auc,
             "ap_difference": random_row.pr_auc - temporal_row.pr_auc,
@@ -532,6 +544,36 @@ def _write_final_report(stability_summary: pd.Series) -> None:
     )
     subgroup_low = subgroup.loc[subgroup.pr_auc.idxmin()]
     subgroup_high = subgroup.loc[subgroup.pr_auc.idxmax()]
+    model_ranking_text = _human_join([
+        f"{MODEL_LABELS[row.model]} ({row.pr_auc:.3f})"
+        for row in main_models.itertuples(index=False)
+    ])
+    top_test_family = main_models.iloc[0].model
+    top_model_label = MODEL_LABELS[top_test_family]
+    validation_main_models = development[
+        development["design"].eq("temporal")
+        & development["block"].eq("B")
+        & development["model"].ne("dummy")
+    ].set_index("model")
+    if top_test_family == core_family:
+        rq2_selection_text = (
+            f"{top_model_label} was also the validation-selected family. No pairwise "
+            "model-difference interval was estimated, so it is described only as the "
+            "highest-performing evaluated family."
+        )
+    else:
+        validation_margin = (
+            validation_main_models.loc[core_family, "pr_auc"]
+            - validation_main_models.loc[top_test_family, "pr_auc"]
+        )
+        rq2_selection_text = (
+            f"{MODEL_LABELS[core_family]} nevertheless remained the locked primary family "
+            f"because its validation AP ({validation_main_models.loc[core_family, 'pr_auc']:.6f}) "
+            f"exceeded {top_model_label}'s ({validation_main_models.loc[top_test_family, 'pr_auc']:.6f}) "
+            f"by {validation_margin:.6f}. The higher observed test AP for {top_model_label} is "
+            "therefore descriptive and does not trigger post-holdout model reselection; no pairwise "
+            "model-difference interval was estimated."
+        )
     zero_recall_subgroups = subgroup.loc[subgroup["recall"].eq(0)].sort_values(
         ["n", "building_type"], ascending=[False, True]
     )
@@ -566,7 +608,7 @@ The main target follows the unambiguous room→floor→whole-building ordering a
 
 ## Validation and modelling
 
-Temporal train/validation/test years are {_year_span(audit['temporal_train_years'])}, {_year_span(audit['temporal_validation_years'])} and {_year_span(audit['temporal_test_years'])}. The stratified random comparator has exactly the same {random_split_sizes} sample sizes. All imputing and encoding were pipeline-fitted on training data only. Compact hyperparameter and family selection used validation average precision (AP), calculated with scikit-learn's non-interpolated `average_precision_score`; analytical classification thresholds maximised validation F1. The selected train-fitted pipeline and its validation-derived threshold were then evaluated once on the corresponding holdout, with no train+validation refit or test-set retuning.
+Temporal train/validation/test years are {_year_span(audit['temporal_train_years'])}, {_year_span(audit['temporal_validation_years'])} and {_year_span(audit['temporal_test_years'])}. The stratified random comparator has exactly the same {random_split_sizes} sample sizes. All preprocessing remained inside the fitted pipelines: Logistic Regression, Random Forest and XGBoost used training-fitted imputation and sparse one-hot encoding, while CatBoost received the original categorical fields after explicit missing-value conversion. Compact hyperparameter and family selection used validation average precision (AP), calculated with scikit-learn's non-interpolated `average_precision_score`; analytical classification thresholds maximised validation F1. The selected train-fitted pipeline and its validation-derived threshold were then evaluated once on the corresponding holdout, with no train+validation refit or test-set retuning.
 
 {shared_configuration_sentence} {differing_configuration_sentence} {core_configuration_sentence}
 
@@ -578,7 +620,7 @@ The main model comparison is Block B, the retrospective incident-information mod
 
 ### RQ1 — Random versus temporal validation
 
-For the validation-selected Block B XGBoost, random holdout AP was {random_core.pr_auc:.3f} (95% bootstrap CI {random_ci.ci_lower_95:.3f}–{random_ci.ci_upper_95:.3f}) and temporal holdout AP was {temporal_core.pr_auc:.3f} ({temporal_ci.ci_lower_95:.3f}–{temporal_ci.ci_upper_95:.3f}). The random-minus-temporal point difference was {difference_ci.point_estimate:+.3f}, with a 95% partially paired bootstrap interval of {difference_ci.ci_lower_95:+.4f} to {difference_ci.ci_upper_95:+.4f}. The holdouts overlap by {int(difference_ci.overlap_n):,} records ({difference_ci.overlap_fraction_random_test:.1%} of each holdout); those records were resampled jointly, while design-specific records were resampled independently within outcome and membership strata. The interval {difference_relation}.
+For the validation-selected Block B {MODEL_LABELS[core_family]}, random holdout AP was {random_core.pr_auc:.3f} (95% bootstrap CI {random_ci.ci_lower_95:.3f}–{random_ci.ci_upper_95:.3f}) and temporal holdout AP was {temporal_core.pr_auc:.3f} ({temporal_ci.ci_lower_95:.3f}–{temporal_ci.ci_upper_95:.3f}). The random-minus-temporal point difference was {difference_ci.point_estimate:+.3f}, with a 95% partially paired bootstrap interval of {difference_ci.ci_lower_95:+.4f} to {difference_ci.ci_upper_95:+.4f}. The holdouts overlap by {int(difference_ci.overlap_n):,} records ({difference_ci.overlap_fraction_random_test:.1%} of each holdout); those records were resampled jointly, while design-specific records were resampled independently within outcome and membership strata. The interval {difference_relation}.
 
 Across-assignment stability was assessed using {stability_count} consecutive split seeds. The original three were retained, and the 17 additions were fixed as a set before their results were inspected. With the estimator seed held fixed, they produced a median random-minus-temporal AP difference of {stability_summary.ap_difference_median:+.3f} (IQR {stability_summary.ap_difference_q1:+.3f} to {stability_summary.ap_difference_q3:+.3f}; range {stability_summary.ap_difference_min:+.3f} to {stability_summary.ap_difference_max:+.3f}); {stability_direction_text}. {stability_interpretation}
 
@@ -586,7 +628,7 @@ The fixed-split bootstrap interval and across-split point range address differen
 
 For the primary split, {primary_split_family_ap_text} ({family_difference_text}), and the corresponding ROC-AUC differences {family_roc_direction_text}. The exact magnitude of random-split optimism varies with the split and should not be treated as universal or operationally important without a decision-specific cost analysis. The repeated splits are an empirical sensitivity analysis under fixed model settings, not a second bootstrap interval or {stability_count} independent datasets.
 
-The direction is not universal across information blocks, even for the same XGBoost family:
+The direction is not universal across information blocks, even for the same {MODEL_LABELS[core_family]} family:
 
 {_format_rows(cross_block.reset_index(), ['block','random_ap','temporal_ap','ap_difference','absolute_lift_difference','normalized_ap_difference','roc_auc_difference'])}
 
@@ -594,7 +636,7 @@ Block A showed a smaller random advantage ({cross_block.loc['A','ap_difference']
 
 The expanding-window models trained on all years available before each test year achieved a sample-size-weighted mean annual AP of {recent_weighted_ap:.3f} in {_year_span(audit['temporal_test_years'])}, compared with {temporal_core.pr_auc:.3f} for the main train-through-{audit['temporal_train_years'][-1]} model on the combined two-year holdout. The {recent_weighted_ap - temporal_core.pr_auc:+.3f} gap suggests that training recency is not a large explanation here, but it is not a clean decomposition: the annual models use different training sets and a weighted mean of annual AP is not the pooled two-year AP.
 
-AP's no-information baseline is approximately the positive prevalence. The random and temporal XGBoost holdouts had prevalences of {random_core.positive_prevalence:.3f} and {temporal_core.positive_prevalence:.3f}, respectively, so their AP values are interpreted with prevalence context:
+AP's no-information baseline is approximately the positive prevalence. The random and temporal {MODEL_LABELS[core_family]} holdouts had prevalences of {random_core.positive_prevalence:.3f} and {temporal_core.positive_prevalence:.3f}, respectively, so their AP values are interpreted with prevalence context:
 
 {_format_rows(context_core.rename(columns={'pr_auc': 'average_precision', 'pr_auc_absolute_lift': 'ap_absolute_lift', 'normalized_pr_auc': 'normalized_ap'}), ['design','positive_prevalence','average_precision','ap_absolute_lift','normalized_ap','roc_auc','brier_score'])}
 
@@ -602,7 +644,7 @@ Normalized AP is an auxiliary prevalence-relative summary, not a replacement pri
 
 ### RQ2 — Best later-year model
 
-XGBoost had the highest temporal Block B AP ({temporal_core.pr_auc:.3f}), followed by Random Forest ({main_models.iloc[1].pr_auc:.3f}) and Logistic Regression ({main_models.iloc[2].pr_auc:.3f}). The margins are small and no pairwise model-difference interval was estimated, so XGBoost is described only as the highest-performing evaluated family.
+The observed temporal Block B test AP ranking was {model_ranking_text}. {rq2_selection_text}
 
 Grouped permutation of each original Block B field on the exact 2022/23–2023/24 temporal test set gave the following five largest mean AP decreases:
 
@@ -668,7 +710,7 @@ def _write_methods_receipt(stability_summary: pd.Series) -> None:
     stability_difference_width = float(stability_summary.ap_difference_range_width)
     policy = load_yaml("config/feature_policy.yaml")
     shared_configuration_families = [
-        family for family in ("logistic_regression", "random_forest", "xgboost")
+        family for family in MODEL_FAMILIES
         if selection["selected_hyperparameters"]["temporal"][family]
         == selection["selected_hyperparameters"]["random"][family]
     ]
@@ -677,7 +719,7 @@ def _write_methods_receipt(stability_summary: pd.Series) -> None:
             "random": selection["selected_hyperparameters"]["random"][family],
             "temporal": selection["selected_hyperparameters"]["temporal"][family],
         }
-        for family in ("logistic_regression", "random_forest", "xgboost")
+        for family in MODEL_FAMILIES
         if family not in shared_configuration_families
     }
     manifest = sorted(set([
@@ -717,7 +759,7 @@ def _write_methods_receipt(stability_summary: pd.Series) -> None:
 - Block A — structural and context: `{audit['feature_blocks']['A']}`
 - Block B — retrospective incident information: `{audit['feature_blocks']['B']}`
 - Block C — first-arrival prognostic: `{audit['feature_blocks']['C']}`
-- All retained predictors are treated as categorical/banded fields. Missing/blank values become `Missing/Unknown`; one-hot encoding uses `handle_unknown='ignore'`. No rare-category merger was required because the largest field has 82 disclosed categories and sparse one-hot encoding remained tractable.
+- All retained predictors are treated as categorical/banded fields. Missing/blank values become `Missing/Unknown`. Logistic Regression, Random Forest and XGBoost use sparse one-hot encoding with `handle_unknown='ignore'`; CatBoost receives the original fields as native string-valued categorical features. No rare-category merger was required because the largest field has 82 disclosed categories.
 - `RESPONSE_TIME` is used; its redundant code field is not used.
 - Leakage blacklist: `{policy['leakage_blacklist']}`
 - Always excluded from predictors: `{policy['always_excluded']}` plus `E_CODE_TERRITORY`.
@@ -743,8 +785,10 @@ def _write_methods_receipt(stability_summary: pd.Series) -> None:
 - Families with identical random and temporal selected hyperparameters: `{shared_configuration_families}`.
 - Families with differing selected hyperparameters, including their design-specific settings: `{json.dumps(differing_configurations, sort_keys=True)}`
 - Validation-selected family by block: `{json.dumps(selection['selected_family_by_block'])}`
+- RQ1 comparator family: `{selection['rq1_comparator_family']}` (the Temporal Block B validation-selected family, evaluated under each design's selected hyperparameters).
 - Validation thresholds: `{json.dumps(selection['validation_thresholds'])}`
 - XGBoost device: `{selection['xgboost_device']}`; tree method: `hist`. The configured device is `{cfg['xgboost_device']}` and must match the recorded selection for a result-reproducing rerun.
+- CatBoost task type: `{selection['catboost_task_type']}`. CPU is fixed for deterministic seeded training; native categorical handling is used without one-hot encoding.
 
 ## Fixed-model uncertainty and prevalence context
 
@@ -764,8 +808,8 @@ def _write_methods_receipt(stability_summary: pd.Series) -> None:
 
 ## Grouped permutation importance
 
-- The validation-selected Temporal Block B XGBoost pipeline is evaluated on the exact saved 2022/23–2023/24 test indices.
-- Each of the 16 original Block B fields is permuted as a whole before the complete fitted preprocessing-and-model pipeline. This automatically groups all one-hot columns derived from that field.
+- The validation-selected Temporal Block B {MODEL_LABELS[selection['selected_family_by_block']['temporal']['B']]} pipeline is evaluated on the exact saved 2022/23–2023/24 test indices.
+- Each of the 16 original Block B fields is permuted as a whole before the complete fitted preprocessing-and-model pipeline. For one-hot models this automatically groups all derived indicator columns; for CatBoost it permutes the native categorical field directly.
 - Each field uses {cfg['permutation_repeats']} repeats with seed {cfg['permutation_seed']}; importance is baseline AP minus permuted AP, with negative values retained.
 - Because {cfg['permutation_repeats']} repeats do not resolve tail quantiles well, permutation variability is summarised by the sample standard deviation rather than empirical 2.5th/97.5th percentiles.
 - Importance measures model dependence, not a causal effect, and may be shared across correlated or overlapping fields.
@@ -788,7 +832,7 @@ def build_report() -> None:
     runtime_path = ROOT / "outputs/metrics/runtime_environment.json"
     runtime = json.loads(runtime_path.read_text(encoding="utf-8"))
     packages = [
-        "numpy", "pandas", "pyarrow", "odfpy", "scikit-learn", "xgboost",
+        "numpy", "pandas", "pyarrow", "odfpy", "scikit-learn", "xgboost", "catboost",
         "scipy", "matplotlib", "joblib", "PyYAML", "pytest",
     ]
     runtime["packages"] = {

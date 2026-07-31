@@ -4,20 +4,22 @@
 
 Candidate configurations are deliberately compact and are selected only by validation-set average precision, calculated with scikit-learn's `average_precision_score`. Holdout performance does not alter the candidate set. The selected configuration is a practical comparison setting, not a claim of theoretical optimality.
 
-XGBoost runtime device: `cuda` (`hist` tree method). CUDA is used only when `nvidia-smi` confirms an available GPU; otherwise execution falls back to CPU.
+XGBoost runtime device: `cuda` (`hist` tree method). CUDA is used only when `nvidia-smi` confirms an available GPU; otherwise execution falls back to CPU. CatBoost is fixed to CPU because its GPU training is non-deterministic; this keeps estimator randomness fixed during the split-assignment sensitivity analysis.
 
 ## Baseline observations
 
 | design | model | validation average precision | fit seconds |
 |---|---|---:|---:|
-| temporal | dummy | 0.2974 | 0.96 |
-| temporal | logistic_regression | 0.6467 | 1.38 |
-| temporal | random_forest | 0.6267 | 70.70 |
-| temporal | xgboost | 0.6637 | 1.27 |
+| temporal | dummy | 0.2974 | 0.93 |
+| temporal | logistic_regression | 0.6467 | 1.35 |
+| temporal | random_forest | 0.6267 | 70.58 |
+| temporal | xgboost | 0.6637 | 1.28 |
+| temporal | catboost | 0.6576 | 5.44 |
 | random | dummy | 0.2572 | 0.91 |
 | random | logistic_regression | 0.6312 | 1.25 |
-| random | random_forest | 0.6117 | 73.73 |
-| random | xgboost | 0.6473 | 1.22 |
+| random | random_forest | 0.6117 | 73.25 |
+| random | xgboost | 0.6473 | 1.21 |
+| random | catboost | 0.6407 | 5.29 |
 
 ## Logistic Regression
 
@@ -42,6 +44,12 @@ XGBoost runtime device: `cuda` (`hist` tree method). CUDA is used only when `nvi
 - `min_child_weight` regularises small child nodes; 1 and 5 are compared.
 - `subsample` and `colsample_bytree` are 1.0 by default; a single 0.8/0.8 configuration checks moderate stochastic regularisation.
 - Four joint configurations keep XGBoost's search budget equal to Random Forest's and avoid a large optimisation exercise.
+
+## CatBoost
+
+- CatBoost receives the original categorical fields directly after train-safe conversion of missing values to `Missing/Unknown`; it does not receive one-hot encoded features.
+- Four joint configurations vary boosting length/shrinkage, tree depth and L2 leaf regularisation while keeping the search budget equal to Random Forest and XGBoost.
+- Training is fixed to CPU with `loss_function='Logloss'`, the common estimator seed and four threads. The validation-selection metric remains external non-interpolated average precision, exactly as for the other families.
 
 ## Candidate configurations
 
@@ -116,6 +124,32 @@ XGBoost runtime device: `cuda` (`hist` tree method). CUDA is used only when `nvi
       "min_child_weight": 5,
       "subsample": 0.8,
       "colsample_bytree": 0.8
+    }
+  ],
+  "catboost": [
+    {
+      "iterations": 100,
+      "learning_rate": 0.1,
+      "depth": 6,
+      "l2_leaf_reg": 3.0
+    },
+    {
+      "iterations": 300,
+      "learning_rate": 0.05,
+      "depth": 6,
+      "l2_leaf_reg": 3.0
+    },
+    {
+      "iterations": 200,
+      "learning_rate": 0.1,
+      "depth": 4,
+      "l2_leaf_reg": 3.0
+    },
+    {
+      "iterations": 200,
+      "learning_rate": 0.1,
+      "depth": 6,
+      "l2_leaf_reg": 10.0
     }
   ]
 }

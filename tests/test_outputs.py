@@ -1,6 +1,7 @@
 import hashlib
 import json
 
+import joblib
 import numpy as np
 import pandas as pd
 from sklearn.metrics import average_precision_score
@@ -48,7 +49,7 @@ def test_required_output_table_schemas():
             "roc_auc", "brier_score",
         },
         "cross_block_split_difference.csv": {
-            "block", "random_ap", "temporal_ap", "ap_difference",
+            "block", "model", "random_ap", "temporal_ap", "ap_difference",
             "absolute_lift_difference", "normalized_ap_difference",
             "roc_auc_difference",
         },
@@ -76,6 +77,11 @@ def test_model_selection_record_contains_reproducible_settings():
     assert set(selection["validation_thresholds"]) == {"random", "temporal"}
     assert selection["seed"] == cfg["random_seed"]
     assert selection["xgboost_device"] == cfg["xgboost_device"]
+    assert selection["catboost_task_type"] == "CPU"
+    assert selection["rq1_comparator_family"] == selection["selected_family_by_block"]["temporal"]["B"]
+    assert set(selection["selected_hyperparameters"]["temporal"]) == {
+        "logistic_regression", "random_forest", "xgboost", "catboost",
+    }
     assert not (ROOT / "outputs/metrics/pre_test_model_config.json").exists()
     assert not (ROOT / "outputs/metrics/post_test_evaluation_receipt.json").exists()
     assert not (ROOT / "outputs/metrics/locked_model_config.json").exists()
@@ -120,9 +126,13 @@ def test_new_outputs_are_nonempty_and_manifested():
 
 def test_core_average_precision_points_are_internally_consistent():
     bootstrap = pd.read_csv(ROOT / "outputs/tables/bootstrap_confidence_intervals.csv")
+    selection = json.loads(
+        (ROOT / "outputs/metrics/model_selection.json").read_text(encoding="utf-8")
+    )
+    family = selection["rq1_comparator_family"]
     for design in ("random", "temporal"):
         performance = pd.read_csv(ROOT / f"outputs/tables/{design}_validation_performance.csv")
-        observed = performance[(performance.block == "B") & (performance.model == "xgboost")].iloc[0].pr_auc
+        observed = performance[(performance.block == "B") & (performance.model == family)].iloc[0].pr_auc
         predictions = pd.read_parquet(ROOT / f"outputs/metrics/predictions_{design}_block_B.parquet")
         calculated = average_precision_score(predictions["LARGER_FIRE"], predictions["probability"])
         ci_point = bootstrap[
@@ -130,6 +140,15 @@ def test_core_average_precision_points_are_internally_consistent():
         ].iloc[0].point_estimate
         assert np.isclose(observed, calculated, rtol=0, atol=1e-12)
         assert np.isclose(calculated, ci_point, rtol=0, atol=1e-12)
+
+
+def test_prevalence_context_contains_all_main_model_families():
+    context = pd.read_csv(ROOT / "outputs/tables/pr_auc_prevalence_context.csv")
+    assert set(context["model"]) == {
+        "logistic_regression", "random_forest", "xgboost", "catboost",
+    }
+    assert set(context["design"]) == {"random", "temporal"}
+    assert len(context) == 8
 
 
 def test_bootstrap_overlap_matches_saved_test_identifiers():
@@ -174,7 +193,7 @@ def test_random_stability_summary_matches_seed_level_receipt():
     selection = json.loads(
         (ROOT / "outputs/metrics/model_selection.json").read_text(encoding="utf-8")
     )
-    family = selection["selected_family_by_block"]["temporal"]["B"]
+    family = selection["rq1_comparator_family"]
     temporal = pd.read_csv(ROOT / "outputs/tables/temporal_validation_performance.csv")
     temporal_ap = temporal[(temporal.block == "B") & (temporal.model == family)].iloc[0].pr_auc
     differences = stability["pr_auc"] - temporal_ap
@@ -198,15 +217,48 @@ def test_grouped_importance_uses_every_block_b_field_and_saved_baseline(cohort):
     expected_features = resolve_blocks(cohort.columns)["B"]
     assert importance["feature"].is_unique
     assert set(importance["feature"]) == set(expected_features)
+    selection = json.loads(
+        (ROOT / "outputs/metrics/model_selection.json").read_text(encoding="utf-8")
+    )
+    family = selection["selected_family_by_block"]["temporal"]["B"]
     temporal = pd.read_csv(ROOT / "outputs/tables/temporal_validation_performance.csv")
-    core = temporal[(temporal.block == "B") & (temporal.model == "xgboost")].iloc[0]
+    core = temporal[(temporal.block == "B") & (temporal.model == family)].iloc[0]
     assert np.allclose(importance["baseline_pr_auc"], core.pr_auc, rtol=0, atol=1e-12)
+    assert set(importance["model"]) == {f"validation-selected {family}"}
     assignments = pd.read_csv(ROOT / "outputs/tables/split_assignments.csv")
     assigned = assignments[
         (assignments.design == "temporal") & (assignments.partition == "test")
     ]["cohort_index"].to_numpy()
     predictions = pd.read_parquet(ROOT / "outputs/metrics/predictions_temporal_block_B.parquet")
     assert np.array_equal(predictions.index.to_numpy(), assigned)
+
+
+def test_saved_selected_catboost_pipelines_reproduce_predictions(cohort):
+    selection = json.loads(
+        (ROOT / "outputs/metrics/model_selection.json").read_text(encoding="utf-8")
+    )
+    blocks = resolve_blocks(cohort.columns)
+    selected_catboost = [
+        (design, block)
+        for design, selected_by_block in selection["selected_family_by_block"].items()
+        for block, family in selected_by_block.items()
+        if family == "catboost"
+        and (block != "B" or family == selection["rq1_comparator_family"])
+    ]
+    assert selected_catboost
+    for design, block in selected_catboost:
+        model = joblib.load(
+            ROOT / f"outputs/models/best_{design}_block_{block}_catboost.joblib"
+        )
+        predictions = pd.read_parquet(
+            ROOT / f"outputs/metrics/predictions_{design}_block_{block}.parquet"
+        )
+        features = blocks[block]
+        reproduced = model.predict_proba(cohort.loc[predictions.index, features])[:, 1]
+        params = model.named_steps["model"].get_params()
+        assert params["task_type"] == "CPU"
+        assert params["cat_features"] == features
+        assert np.allclose(reproduced, predictions["probability"], rtol=0, atol=1e-12)
 
 
 def test_expanding_window_has_valid_prevalence_context():

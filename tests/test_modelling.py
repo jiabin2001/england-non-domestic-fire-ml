@@ -26,3 +26,10 @@ def test_auto_xgboost_device_is_visible(monkeypatch):
 def test_invalid_xgboost_device_is_rejected():
     with pytest.raises(ValueError, match="cpu, cuda, auto"):
         modelling.resolve_xgb_device("gpu-maybe")
+
+
+def test_main_family_search_budgets_remain_equal():
+    grid = modelling.candidate_grid()
+    assert set(grid) == set(modelling.FAMILIES)
+    assert len(grid["logistic_regression"]) == 3
+    assert len(grid["catboost"]) == len(grid["random_forest"]) == len(grid["xgboost"]) == 4

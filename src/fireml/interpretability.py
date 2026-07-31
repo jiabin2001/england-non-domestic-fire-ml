@@ -74,6 +74,7 @@ def grouped_permutation_importance(
     repeats: int = 30,
     seed: int = 20260821,
     baseline_probability: np.ndarray | pd.Series | None = None,
+    model_label: str = "validation-selected model",
 ) -> pd.DataFrame:
     """Permute one original input field at a time and score the complete pipeline."""
     if repeats < 1:
@@ -110,7 +111,7 @@ def grouped_permutation_importance(
             "permutation_seed": seed,
             "design": "temporal",
             "block": "B",
-            "model": "validation-selected XGBoost",
+            "model": model_label,
             "evaluation_set": "2022/23-2023/24 temporal test set",
         })
     return pd.DataFrame(rows).sort_values(
@@ -119,24 +120,21 @@ def grouped_permutation_importance(
 
 
 def run_grouped_permutation_analysis() -> pd.DataFrame:
-    """Explain the fixed Temporal Block B XGBoost pipeline on its saved test set."""
+    """Explain the validation-selected Temporal Block B pipeline on its saved test set."""
     ensure_output_dirs()
     cfg = load_yaml("config/analysis.yaml")
     selection_path = ROOT / "outputs/metrics/model_selection.json"
     selection = json.loads(selection_path.read_text(encoding="utf-8"))
     selected = selection["selected_family_by_block"]["temporal"]["B"]
-    if selected != "xgboost":
-        raise ValueError(
-            f"Temporal Block B selected family is {selected!r}, not the required XGBoost."
-        )
 
     x_test, y_test, saved_probability, _ = load_temporal_test_data()
     model = joblib.load(
-        ROOT / "outputs/models/best_temporal_block_B_xgboost.joblib"
+        ROOT / f"outputs/models/best_temporal_block_B_{selected}.joblib"
     )
-    # The fitted trees are unchanged; CPU inference matches the sparse CPU input and
-    # avoids XGBoost's much slower cross-device DMatrix fallback during 480 predictions.
-    model.set_params(model__device="cpu")
+    if selected == "xgboost":
+        # The fitted trees are unchanged; CPU inference matches the sparse CPU input and
+        # avoids XGBoost's much slower cross-device DMatrix fallback during prediction.
+        model.set_params(model__device="cpu")
     model_features = list(model.feature_names_in_)
     if model_features != list(x_test.columns):
         raise ValueError("Saved pipeline input fields do not match the current Block B policy.")
@@ -151,6 +149,7 @@ def run_grouped_permutation_analysis() -> pd.DataFrame:
         repeats=int(cfg["permutation_repeats"]),
         seed=int(cfg["permutation_seed"]),
         baseline_probability=saved_probability,
+        model_label=f"validation-selected {selected}",
     )
     importance.to_csv(
         ROOT / "outputs/tables/grouped_permutation_importance.csv", index=False
