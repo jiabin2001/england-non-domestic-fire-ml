@@ -1,7 +1,5 @@
 # Day 1 feasibility audit
 
-> Historical feasibility audit. The counts, source details and original proceed decision below are retained without re-importing data. Subsequent documentation corrections concerning field timing and annual validation are recorded in [no-rerun revision note](no_rerun_revision.md); the original availability checks do not establish that fields were known at prediction time.
-
 ## Decision
 
 **Feasible — proceed to cohort construction and modelling.**
@@ -32,8 +30,8 @@ For 2024/25, the main study estimand (excluding roofs) gives 23.9% among mappabl
 ## Time and data quality
 
 - Available years: 2010/11, 2011/12, 2012/13, 2013/14, 2014/15, 2015/16, 2016/17, 2017/18, 2018/19, 2019/20, 2020/21, 2021/22, 2022/23, 2023/24, 2024/25, 2025/26.
-- All prespecified main years 2010/11–2023/24 are present.
-- The two latest complete main-window years become temporal test (2022/23–2023/24); the preceding two become validation (2020/21–2021/22); earlier years form training.
+- All configured main years 2010/11–2023/24 present: yes.
+- Temporal test uses the latest 2 main-window years (2022/23, 2023/24); validation uses the preceding 2 (2020/21, 2021/22); earlier years form training.
 - The dataset has no incident date or month. Calendar timing is limited to financial year, day of week and four day-part bands. It also contains banded process durations (`IGNITION_TO_DISCOVERY`, `DISCOVERY_TO_CALL`, `RESPONSE_TIME`, `TIME_AT_SCENE`); the latter are not calendar timestamps.
 - Suffolk FRS is incomplete from September 2024 to March 2025 according to current official guidance, so 2024/25 is excluded from the main analysis.
 - 2025/26 spans the IRS-to-FaRDaP collection transition beginning November 2025 and is excluded from the main analysis.
@@ -46,7 +44,7 @@ For 2024/25, the main study estimand (excluding roofs) gives 23.9% among mappabl
 - Target categories reliably mappable: yes, with roofs explicitly excluded in the main definition.
 - Financial-year design usable: yes.
 - Key Block A/B/C fields usable in 2010/11–2023/24: yes; maximum field missingness is 0.0%.
-- Guidance consistency: the original audit recorded no blocking inconsistency. Later review identified an interpretation limitation: `OCCUPIED_TIME` may count people in buildings reached by spread, and Block C inherits retrospective investigation fields. These issues require the revised interpretation; their effects on performance have not been tested.
+- Information timing: Block C inherits retrospective investigation fields. `OCCUPIED_TIME` can include occupants in buildings reached by spread and is a potential outcome proxy. Field availability and missingness do not establish availability at prediction time. The final analysis separately reports an occupancy-removal sensitivity and simple single-field baselines.
 
 ## Main analysis window
 

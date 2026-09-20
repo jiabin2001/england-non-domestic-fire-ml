@@ -91,16 +91,17 @@ def _write_report_environment() -> None:
             packages[package] = importlib.metadata.version(package)
         except importlib.metadata.PackageNotFoundError:
             packages[package] = None
-    historical_receipts = {}
+    input_receipts = {}
     for name in ("runtime_environment", "data_archive_manifest", "model_selection"):
         path = ROOT / f"outputs/metrics/{name}.json"
-        historical_receipts[str(path.relative_to(ROOT)).replace("\\", "/")] = {
+        input_receipts[str(path.relative_to(ROOT)).replace("\\", "/")] = {
             "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-            "status": "existing artifact preserved; historical accuracy not reverified",
+            "role": "analysis input receipt",
         }
     context = {
         "record_type": "report_render_environment",
         "rendered_at_utc": datetime.now(timezone.utc).isoformat(),
+        "renderer_source_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "python": platform.python_version(),
         "platform": platform.platform(),
         "packages": packages,
@@ -109,7 +110,7 @@ def _write_report_environment() -> None:
             "summaries from saved predictions/results; no data acquisition, model fitting, "
             "bootstrap or permutation analysis. These versions are not training provenance."
         ),
-        "historical_receipts": historical_receipts,
+        "input_receipts": input_receipts,
     }
     (ROOT / "outputs/metrics/report_environment.json").write_text(
         json.dumps(context, indent=2), encoding="utf-8"
@@ -157,7 +158,7 @@ def _model_ranking_text(main_models: pd.DataFrame, selected_family: str) -> str:
     return (
         f"Temporal Block B AP, ordered by observed test score, was: {scores}. "
         f"The validation-selected family was {MODEL_LABELS[selected_family]}. "
-        "No pairwise model-difference interval was estimated; this ranking does not "
+        "No pairwise difference interval between these full-Block-B model families was estimated; this ranking does not "
         "establish a statistically superior family and is not used to reselect the model."
     )
 
@@ -396,6 +397,200 @@ def _grouped_permutation_figure() -> None:
     _save(fig, "10_grouped_permutation_importance")
 
 
+DIAGNOSTIC_LABELS = {
+    "b_minus_occupied_random": "Block B without OCCUPIED_TIME",
+    "b_minus_occupied_temporal": "Block B without OCCUPIED_TIME",
+    "building_type_temporal": "BUILDING_TYPE only",
+    "arrival_size_temporal": "FIRE_SIZE_ON_ARRIVAL only",
+}
+
+
+def _load_diagnostics() -> dict | None:
+    directory = ROOT / "outputs/diagnostics"
+    if not directory.exists():
+        return None
+    required = ("performance.csv", "uncertainty.csv", "experiment_receipt.json", "uncertainty_receipt.json")
+    missing = [name for name in required if not (directory / name).is_file()]
+    if missing:
+        raise FileNotFoundError("Incomplete diagnostics outputs: " + ", ".join(missing))
+    receipt = json.loads((directory / "experiment_receipt.json").read_text(encoding="utf-8"))
+    uncertainty_receipt = json.loads((directory / "uncertainty_receipt.json").read_text(encoding="utf-8"))
+    if receipt["status"] != "fits_completed":
+        raise ValueError("Diagnostics fits are incomplete; finish them before rendering.")
+    for name, expected in (
+        ("performance.csv", receipt["performance_sha256"]),
+        ("uncertainty.csv", uncertainty_receipt["output_sha256"]),
+    ):
+        if hashlib.sha256((directory / name).read_bytes()).hexdigest() != expected:
+            raise ValueError(f"Diagnostics {name} differs from its completion receipt.")
+    # A core rerun invalidates comparisons to its previous fitted predictions.
+    for relative, expected in receipt["identity"]["input_sha256"].items():
+        if relative.startswith(("outputs/metrics/", "outputs/tables/")):
+            path = ROOT / relative
+            if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+                raise ValueError(f"Diagnostics reference input changed: {relative}; rerun diagnostics.")
+    data = {
+        "performance": pd.read_csv(directory / "performance.csv"),
+        "uncertainty": pd.read_csv(directory / "uncertainty.csv"),
+        "receipt": receipt,
+        "uncertainty_receipt": uncertainty_receipt,
+    }
+    _diagnostic_comparisons(data)  # Validate complete one-to-one comparisons before any writes.
+    _diagnostics_report_section(data)  # Also requires the completed cross-design interval.
+    _diagnostics_methods_section(data)
+    return data
+
+
+def _diagnostic_comparisons(data: dict) -> list[dict]:
+    results = []
+    performance = data["performance"]
+    uncertainty = data["uncertainty"]
+    for experiment_id, label in DIAGNOSTIC_LABELS.items():
+        rows = performance[performance.experiment_id.eq(experiment_id) & performance.split_role.eq("test")]
+        intervals = uncertainty[uncertainty.experiment_id.eq(experiment_id)]
+        new = intervals[intervals.estimand.eq("average precision") & intervals.model.eq(experiment_id)]
+        reference = intervals[intervals.estimand.eq("average precision") & ~intervals.model.eq(experiment_id)]
+        difference = intervals[intervals.estimand.eq("paired new-minus-reference average-precision difference")]
+        if any(len(frame) != 1 for frame in (rows, new, reference, difference)):
+            raise ValueError(f"Expected exactly one test result and paired comparison for {experiment_id}.")
+        performance_row = rows.iloc[0]
+        new_row, reference_row, difference_row = new.iloc[0], reference.iloc[0], difference.iloc[0]
+        if not np.isclose(float(performance_row.pr_auc), float(new_row.point_estimate), atol=1e-12, rtol=1e-10):
+            raise ValueError(f"Diagnostics AP disagrees with its uncertainty result: {experiment_id}.")
+        if not np.isclose(
+            float(new_row.point_estimate) - float(reference_row.point_estimate),
+            float(difference_row.point_estimate), atol=1e-12, rtol=1e-10,
+        ):
+            raise ValueError(f"Diagnostics paired difference is inconsistent: {experiment_id}.")
+        results.append({
+            "experiment_id": experiment_id, "label": label, "performance": performance_row,
+            "new": new_row, "reference": reference_row, "difference": difference_row,
+        })
+    return results
+
+
+def _interval_label(row: pd.Series, signed: bool = False) -> str:
+    spec = "+.4f" if signed else ".4f"
+    return (
+        f"{format(row.point_estimate, spec)} "
+        f"[{format(row.ci_lower_95, spec)}, {format(row.ci_upper_95, spec)}]"
+    )
+
+
+def _plot_interval(ax: plt.Axes, row: pd.Series, y: float, color: str, label: str | None = None) -> None:
+    # Draw endpoints directly: a percentile interval need not contain its point estimate.
+    ax.hlines(y, row.ci_lower_95, row.ci_upper_95, color=color, linewidth=2)
+    ax.plot(row.point_estimate, y, "|", color=color, markersize=8, markeredgewidth=1.4, label=label)
+
+
+def _diagnostic_figures(data: dict) -> None:
+    comparisons = _diagnostic_comparisons(data)
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.6), gridspec_kw={"width_ratios": [1.15, 1]})
+    for y, comparison in enumerate(comparisons[:2]):
+        _plot_interval(axes[0], comparison["reference"], y - 0.13, "#4c78a8", "Full Block B" if y == 0 else None)
+        _plot_interval(axes[0], comparison["new"], y + 0.13, "#f58518", "Without OCCUPIED_TIME" if y == 0 else None)
+        _plot_interval(axes[1], comparison["difference"], y, "#315b6d")
+        axes[1].annotate(
+            _interval_label(comparison["difference"], signed=True), (0.02, y + 0.21),
+            xycoords=("axes fraction", "data"), fontsize=8.5,
+        )
+    for ax in axes:
+        ax.set_yticks([0, 1], ["Random", "Temporal"])
+        ax.set_ylim(1.65, -0.65)
+        ax.grid(axis="x", alpha=0.2)
+    axes[0].set_xlabel("Average precision (95% fixed-model bootstrap interval)")
+    axes[0].set_title("Same split and selected XGBoost settings")
+    axes[0].legend(frameon=False, loc="lower right", fontsize=8.5)
+    axes[1].axvline(0, color="#777777", linestyle="--", linewidth=1)
+    axes[1].set_xlabel("AP difference: without occupancy − full B")
+    axes[1].set_title("Paired differences on identical test records")
+    fig.suptitle("Occupancy-field removal sensitivity", fontsize=13)
+    _save(fig, "11_occupancy_ablation")
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.8), gridspec_kw={"width_ratios": [1.2, 1]})
+    for y, comparison in enumerate(comparisons[2:]):
+        _plot_interval(axes[0], comparison["reference"], y - 0.13, "#4c78a8", "Full reference model" if y == 0 else None)
+        _plot_interval(axes[0], comparison["new"], y + 0.13, "#72a06a", "Single-field logistic regression" if y == 0 else None)
+        _plot_interval(axes[1], comparison["difference"], y, "#315b6d")
+        axes[1].annotate(
+            _interval_label(comparison["difference"], signed=True), (0.02, y + 0.21),
+            xycoords=("axes fraction", "data"), fontsize=8.5,
+        )
+    for ax in axes:
+        ax.set_yticks([0, 1], ["Building type only\nversus full B", "Arrival fire size only\nversus full C"])
+        ax.set_ylim(1.65, -0.65)
+        ax.grid(axis="x", alpha=0.2)
+    axes[0].set_xlim(0, 1.02)
+    axes[0].set_xlabel("Average precision (95% fixed-model bootstrap interval)")
+    axes[0].set_title("Temporal holdout: simple baselines and full models")
+    axes[0].legend(frameon=False, loc="lower left", fontsize=8)
+    axes[1].axvline(0, color="#777777", linestyle="--", linewidth=1)
+    axes[1].set_xlabel("AP difference: single-field baseline − full reference")
+    axes[1].set_title("Paired pipeline comparisons")
+    fig.suptitle("Information and model family both change; differences do not isolate feature effects", fontsize=10.5)
+    _save(fig, "12_simple_baselines")
+
+
+def _diagnostics_report_section(data: dict | None) -> str:
+    if data is None:
+        return ""
+    rows = []
+    for comparison in _diagnostic_comparisons(data):
+        performance = comparison["performance"]
+        rows.append({
+            "analysis": comparison["label"], "design": performance.design,
+            "model": MODEL_LABELS[performance.model],
+            "AP [95% CI]": _interval_label(comparison["new"]),
+            "reference": f"Full Block {performance.reference_block}",
+            "reference AP [95% CI]": _interval_label(comparison["reference"]),
+            "new minus reference [95% CI]": _interval_label(comparison["difference"], signed=True),
+        })
+    uncertainty = data["uncertainty"]
+    split = uncertainty[
+        uncertainty.experiment_id.eq("b_minus_occupied_random_minus_temporal")
+        & uncertainty.design.eq("random-minus-temporal")
+    ]
+    if len(split) != 1:
+        raise ValueError("Expected one occupancy-removal random-minus-temporal comparison.")
+    split = split.iloc[0]
+    repeats = int(data["uncertainty_receipt"]["bootstrap_repeats"])
+    table = _format_rows(pd.DataFrame(rows), list(rows[0]))
+    return f"""## Post-review diagnostics
+
+Four additional fits assess occupancy-field sensitivity and simple single-field baselines using the same source cohort and saved train/validation/test assignments as the primary run. They were motivated after inspecting the study and are exploratory; these test periods are not a new untouched validation set.
+
+{table}
+
+The occupancy-removal models retain the primary XGBoost settings and estimator seed, with `OCCUPIED_TIME` removed from Block B. Their random-minus-temporal AP difference was {_interval_label(split, signed=True)}. This is a partially paired fixed-model comparison accounting for shared test records. A change from the full-Block-B split difference is descriptive: no joint difference-of-differences interval was estimated.
+
+`OCCUPIED_TIME` can include occupants in buildings reached by spread. Removing it measures sensitivity under fixed selected settings, not the presence or amount of leakage; other fields may substitute for its information, and the reduced feature set was not retuned. The single-field baselines use train-fitted categorical preprocessing and logistic regression with fixed C=1.0. Their comparisons change both information and model family, so they do not isolate the incremental effect of extra fields. The arrival-state-only baseline does not establish that the complete Block C feature set is available at arrival.
+
+All displayed intervals use {repeats:,} bootstrap repeats and condition on the fitted pipelines and observed outcome counts. Within each model comparison, identical test records are resampled jointly after alignment by `SOURCE_ROW_ID`; differences are calculated within each replicate. Selection uncertainty and multiplicity adjustment are not included. Each new classification threshold maximises validation F1 for the same train-fitted pipeline used on test.
+
+![Occupancy-field removal sensitivity](../outputs/figures/11_occupancy_ablation.png)
+
+![Temporal single-field baselines and full reference models](../outputs/figures/12_simple_baselines.png)
+"""
+
+
+def _diagnostics_methods_section(data: dict | None) -> str:
+    if data is None:
+        return ""
+    plan = data["receipt"]["identity"]["experiment_plan"]
+    uncertainty = data["uncertainty_receipt"]
+    return f"""## Post-review diagnostic protocol
+
+- Four additional fits: `{json.dumps(plan, sort_keys=True)}`.
+- The primary run's cohort, ordered split assignments, source identifiers and labels are verified before fitting; reference predictions must agree with their recorded performance.
+- Each pipeline fits preprocessing and the estimator on training records only. Validation chooses its F1 threshold; the same fitted pipeline is evaluated on test without a train+validation refit.
+- Bootstrap repeats: {int(uncertainty['bootstrap_repeats']):,}; seed: {int(uncertainty['bootstrap_seed'])}. Paired intervals compare diagnostic minus full-reference AP; the occupancy-removal split contrast is random minus temporal with partially paired resampling.
+- {uncertainty['method_notes']}
+- Occupancy removal is a fixed-configuration sensitivity, not a leakage test. The single-field comparisons change both model family and information set. The new diagnostics use already-inspected test periods and are exploratory.
+- Input/code hashes, complete fit settings, actual devices, software versions and result hashes: `outputs/diagnostics/experiment_receipt.json` and `outputs/diagnostics/uncertainty_receipt.json`. Predictions, fitted models and validation/test performance are retained alongside them.
+
+"""
+
+
 def _format_rows(frame: pd.DataFrame, columns: list[str], decimals: int = 3) -> str:
     header = "| " + " | ".join(columns) + " |"
     rule = "|" + "|".join("---" for _ in columns) + "|"
@@ -473,7 +668,7 @@ def _write_random_stability_summary() -> pd.Series:
     return summary.iloc[0]
 
 
-def _write_final_report(stability_summary: pd.Series) -> None:
+def _write_final_report(stability_summary: pd.Series, diagnostics: dict | None = None) -> None:
     cfg = load_yaml("config/analysis.yaml")
     metadata = json.loads((ROOT / "data/raw/source_metadata.json").read_text(encoding="utf-8"))
     audit = json.loads((ROOT / "outputs/metrics/audit_receipt.json").read_text(encoding="utf-8"))
@@ -684,6 +879,13 @@ def _write_final_report(stability_summary: pd.Series) -> None:
         )
     annual_evaluation_note = _annual_evaluation_note(expanding, audit)
     model_ranking_text = _model_ranking_text(main_models, core_family)
+    diagnostics_section = _diagnostics_report_section(diagnostics)
+    occupancy_limit = (
+        "The post-review removal sensitivity quantifies score changes under fixed model settings, "
+        "but cannot establish the presence or amount of leakage."
+        if diagnostics is not None else
+        "No removal sensitivity is included in this run, so its effect on these scores is unknown."
+    )
     report = f"""# Final analysis report
 
 ## Study definition
@@ -692,7 +894,7 @@ This retrospective prediction study uses the official **Other Building Fires Dat
 
 The analysis predicts incident-level final fire spread among already-recorded primary fires. It is not a causal study, annual building fire-risk model, fire-physics simulation or real-time FRS deployment tool. Block B contains retrospectively recorded incident information; Block C combines retrospective incident information plus arrival-state information. Its inherited Block B investigation fields have not been established as available at first arrival.
 
-This report is rendered from saved analysis artifacts. Rendering does not rerun training or validate historical results under revised code. See [no-rerun revision notes](no_rerun_revision.md) for the status of the reviewed historical snapshot and the unchanged numerical artifacts.
+The fitted predictions, evaluation tables and method receipts from this analysis run supply the results below. The training and report-rendering environments are recorded separately.
 
 ## Data and cohort
 
@@ -772,13 +974,15 @@ Across target, cohort and new-year checks, normalized AP ranged from {sensitivit
 
 Building-type subgroup AP ranged from {subgroup_low.pr_auc:.3f} for {subgroup_low.building_type} (prevalence {subgroup_low.positive_prevalence:.3f}) to {subgroup_high.pr_auc:.3f} for {subgroup_high.building_type} ({subgroup_high.positive_prevalence:.3f}). {subgroup_threshold_text} These are descriptive diagnostics of the saved model and global threshold, not evidence that building type causes fire spread or that the remaining fields lack within-group signal.
 
+{diagnostics_section}
+
 ## Limitations
 
 - The public file has no incident identifier or exact date/month, limiting dependence checks and finer temporal validation.
 - Incident fields may reflect officer judgement; cause/ignition fields may be revised after investigation, and delay fields may be estimated.
 - Block B is retrospective and not strictly dispatch-time information.
-- Block C includes both retrospective fields and an arrival-state field close to the final outcome. Its score does not establish deployability at arrival; the contribution of that state field requires a simple baseline or ablation to quantify.
-- `OCCUPIED_TIME` can include occupants in buildings to which the fire spread, potentially encoding already-realised spread. No removal ablation has been run, so its effect on the saved scores is unknown.
+- Block C includes both retrospective fields and arrival-state information close to the final outcome. Its score does not establish deployability at arrival; a comparison against an arrival-state-only baseline changes both information and model family.
+- `OCCUPIED_TIME` can include occupants in buildings to which the fire spread, potentially encoding already-realised spread. {occupancy_limit}
 - Average precision is prevalence-sensitive; cross-split and subgroup comparisons require their respective positive prevalences.
 - Hyperparameters and analytical thresholds were selected using {_year_span(audit['temporal_validation_years'])}. Annual folds within or before that window are development-period descriptive results, not independent temporal validation.
 - Bootstrap intervals condition on the fixed splits, fitted models and selected settings; they do not represent repeated end-to-end model-selection uncertainty.
@@ -789,12 +993,12 @@ Building-type subgroup AP ranged from {subgroup_low.pr_auc:.3f} for {subgroup_lo
 
 ## Reproducibility
 
-All tables, figures, fitted selected pipelines, split assignments, model-selection settings, software versions and method decisions are saved under `outputs/` and `reports/`. `python scripts/06_build_report.py` runs the full analysis, including model fitting. To render saved artifacts only, use `python scripts/07_render_report.py`; it recomputes confusion/calibration and table summaries but performs no acquisition, model fitting, bootstrap or permutation analysis. Historical `runtime_environment.json`, `model_selection.json` and `data_archive_manifest.json` remain unchanged; the current render environment is recorded separately in `report_environment.json`. Their preservation does not independently verify historical provenance.
+All tables, figures, fitted selected pipelines, split assignments, model-selection settings, software versions and method decisions are saved under `outputs/` and `reports/`. `python scripts/06_build_report.py --clean` rebuilds the complete study, including model fitting and diagnostics. To render saved artifacts only, use `python scripts/07_render_report.py`; it recomputes confusion/calibration and table summaries but performs no acquisition, model fitting, bootstrap or permutation analysis. Training settings and versions are recorded when models fit; the rendering environment is recorded separately in `outputs/metrics/report_environment.json`.
 """
     (ROOT / "reports/final_analysis_report.md").write_text(report, encoding="utf-8")
 
 
-def _write_methods_receipt(stability_summary: pd.Series) -> None:
+def _write_methods_receipt(stability_summary: pd.Series, diagnostics: dict | None = None) -> None:
     cfg = load_yaml("config/analysis.yaml")
     metadata = json.loads((ROOT / "data/raw/source_metadata.json").read_text(encoding="utf-8"))
     audit = json.loads((ROOT / "outputs/metrics/audit_receipt.json").read_text(encoding="utf-8"))
@@ -811,6 +1015,12 @@ def _write_methods_receipt(stability_summary: pd.Series) -> None:
     policy = load_yaml("config/feature_policy.yaml")
     core_family = selection["selected_family_by_block"]["temporal"]["B"]
     annual_evaluation_note = _annual_evaluation_note(expanding, audit)
+    diagnostics_methods = _diagnostics_methods_section(diagnostics)
+    occupancy_method_note = (
+        "Its removal is evaluated in the post-review fixed-configuration sensitivity, which "
+        "does not identify the presence or amount of leakage."
+        if diagnostics is not None else "No removal sensitivity is included in this run."
+    )
     shared_configuration_families = [
         family for family in ("logistic_regression", "random_forest", "xgboost")
         if selection["selected_hyperparameters"]["temporal"][family]
@@ -831,7 +1041,7 @@ def _write_methods_receipt(stability_summary: pd.Series) -> None:
     ] + ["reports/methods_receipt.md", "outputs/metrics/output_manifest.json"]))
     receipt = f"""# Methods receipt
 
-Rendered from saved artifacts. Rendering does not rerun the analysis or verify unknown historical provenance. See [no-rerun revision notes](no_rerun_revision.md) for the reviewed snapshot's status.
+This receipt describes the analysis settings and saved outputs used to generate the report. Training and rendering environments are recorded separately.
 
 ## Source
 
@@ -863,8 +1073,8 @@ Rendered from saved artifacts. Rendering does not rerun the analysis or verify u
 - Block A — structural and context: `{audit['feature_blocks']['A']}`
 - Block B — retrospective incident information: `{audit['feature_blocks']['B']}`
 - Block C — retrospective incident information plus arrival-state information: `{audit['feature_blocks']['C']}`
-- Block C inherits retrospective cause/ignition fields from Block B; availability of the complete set at arrival has not been established. Its arrival-state field is close to the outcome, and no simple arrival-state-only baseline or ablation quantifies that field's contribution here.
-- `OCCUPIED_TIME` may include occupants in buildings to which the fire spread, potentially encoding already-realised spread; no removal ablation has quantified its effect on these saved results.
+- Block C inherits retrospective cause/ignition fields from Block B; availability of the complete set at arrival has not been established. Its arrival-state information is close to the outcome. A single-field baseline comparison changes both information and model family and cannot isolate the effect of additional features.
+- `OCCUPIED_TIME` may include occupants in buildings to which the fire spread, potentially encoding already-realised spread. {occupancy_method_note}
 - All retained predictors are treated as categorical/banded fields. Missing/blank values become `Missing/Unknown`; one-hot encoding uses `handle_unknown='ignore'`. No rare-category merger is applied.
 - `RESPONSE_TIME` is used; its redundant code field is not used.
 - Leakage blacklist: `{policy['leakage_blacklist']}`
@@ -918,9 +1128,9 @@ Rendered from saved artifacts. Rendering does not rerun the analysis or verify u
 - Because {cfg['permutation_repeats']} repeats do not resolve tail quantiles well, permutation variability is summarised by the sample standard deviation rather than empirical 2.5th/97.5th percentiles.
 - Importance measures model dependence, not a causal effect, and may be shared across correlated or overlapping fields.
 
-## Existing historical runtime record
+{diagnostics_methods}## Training environment
 
-The following record is preserved unchanged. Earlier reporting code could overwrite its package list; preservation cannot verify whether that happened historically. Unknown training metadata is not backfilled from the current environment.
+The following versions and device settings were recorded during core model training.
 
 ```json
 {json.dumps(runtime, indent=2)}
@@ -928,7 +1138,7 @@ The following record is preserved unchanged. Earlier reporting code could overwr
 
 ## Current report-render environment
 
-These versions describe this rendering process only, not the original training environment.
+These versions describe report rendering. The training environment is recorded above.
 
 ```json
 {json.dumps(render_environment, indent=2)}
@@ -945,15 +1155,18 @@ def build_report() -> None:
     """Render saved artifacts, recomputing only confusion/calibration and table summaries.
 
     Does not acquire data, fit models, or rerun bootstrap/permutation analyses.
-    Historical training/source receipts are read-only inputs to this operation.
+    Training/source receipts are read-only inputs to this operation.
     """
     _require_report_inputs()
     _validate_report_selection()
+    diagnostics = _load_diagnostics()
     ensure_output_dirs()
     _write_report_environment()
     _workflow_figure(); _annual_figure(); _random_temporal_figure(); _expanding_figure()
     _block_figure(); _confusion_and_calibration(); _subgroup_figure()
     _bootstrap_figure(); _grouped_permutation_figure()
+    if diagnostics is not None:
+        _diagnostic_figures(diagnostics)
     stability_summary = _write_random_stability_summary()
-    _write_final_report(stability_summary)
-    _write_methods_receipt(stability_summary)
+    _write_final_report(stability_summary, diagnostics)
+    _write_methods_receipt(stability_summary, diagnostics)

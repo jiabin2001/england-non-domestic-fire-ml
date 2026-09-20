@@ -1,0 +1,10 @@
+# Receipts hash exact runtime bytes. Preserve them on Windows/Linux checkouts.
+# -text disables line-ending conversion while retaining normal text diffs.
+# CRLF emitted by Windows writers is an intentional line ending, not whitespace.
+* whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+outputs/** -text
+data/raw/source_metadata.json -text
+src/fireml/*.py -text
+config/*.yaml -text
+scripts/*.py -text
+pyproject.toml -text

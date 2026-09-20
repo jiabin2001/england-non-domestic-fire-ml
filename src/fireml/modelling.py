@@ -15,6 +15,7 @@ import sklearn
 import xgboost
 from sklearn.dummy import DummyClassifier
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.exceptions import ConvergenceWarning
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from xgboost import XGBClassifier
@@ -148,6 +149,21 @@ def make_model_pipeline(columns: list[str], family: str, parameters: dict[str, A
     ])
 
 
+def fit_pipeline_checked(
+    pipeline: Pipeline, features: pd.DataFrame, target: pd.Series, *, family: str, device: str,
+) -> Pipeline:
+    """Reject unconverged fits and XGBoost fallback from requested CUDA execution."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", ConvergenceWarning)
+        pipeline.fit(features, target)
+    if family == "xgboost" and device.startswith("cuda"):
+        configuration = json.loads(pipeline.named_steps["model"].get_booster().save_config())
+        actual = configuration["learner"]["generic_param"]["device"]
+        if not actual.startswith("cuda"):
+            raise RuntimeError(f"XGBoost fitted on {actual} despite requested {device}; CUDA fit required.")
+    return pipeline
+
+
 def _fit_validation(
     frame: pd.DataFrame,
     split: dict[str, np.ndarray],
@@ -160,7 +176,10 @@ def _fit_validation(
 ) -> tuple[Pipeline, np.ndarray, dict]:
     pipeline = make_model_pipeline(columns, family, parameters, seed, n_jobs, device)
     start = time.perf_counter()
-    pipeline.fit(frame.loc[split["train"], columns], frame.loc[split["train"], "LARGER_FIRE"])
+    fit_pipeline_checked(
+        pipeline, frame.loc[split["train"], columns], frame.loc[split["train"], "LARGER_FIRE"],
+        family=family, device=device,
+    )
     seconds = time.perf_counter() - start
     probability = pipeline.predict_proba(frame.loc[split["validation"], columns])[:, 1]
     threshold = choose_f1_threshold(frame.loc[split["validation"], "LARGER_FIRE"].to_numpy(), probability)
@@ -344,9 +363,11 @@ def run_core_models() -> dict[str, Any]:
                 params = {} if family == "dummy" else chosen[design][family]
                 pipeline = make_model_pipeline(columns, family, params, seed, n_jobs, device)
                 start = time.perf_counter()
-                pipeline.fit(
+                fit_pipeline_checked(
+                    pipeline,
                     frame.loc[split["train"], columns],
                     frame.loc[split["train"], "LARGER_FIRE"],
+                    family=family, device=device,
                 )
                 seconds = time.perf_counter() - start
                 probability = pipeline.predict_proba(frame.loc[split["test"], columns])[:, 1]

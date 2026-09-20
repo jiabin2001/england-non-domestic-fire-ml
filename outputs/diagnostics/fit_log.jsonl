@@ -1,0 +1,24 @@
+{"timestamp_utc": "2026-09-20T21:34:14.364219+00:00", "event": "fit_started", "experiment_id": "b_minus_occupied_random", "training_rows": 159533}
+{"timestamp_utc": "2026-09-20T21:34:15.739235+00:00", "event": "cuda_fit_verified", "experiment_id": "b_minus_occupied_random", "actual_device": "cuda:0"}
+{"timestamp_utc": "2026-09-20T21:34:15.857425+00:00", "event": "validation_threshold_frozen", "experiment_id": "b_minus_occupied_random", "threshold": 0.34006059169769287}
+{"timestamp_utc": "2026-09-20T21:34:16.082307+00:00", "event": "fit_completed", "experiment_id": "b_minus_occupied_random", "fit_seconds": 1.3735141000070143}
+{"timestamp_utc": "2026-09-20T21:34:16.110369+00:00", "event": "fit_started", "experiment_id": "b_minus_occupied_temporal", "training_rows": 159533}
+{"timestamp_utc": "2026-09-20T21:34:17.423536+00:00", "event": "cuda_fit_verified", "experiment_id": "b_minus_occupied_temporal", "actual_device": "cuda:0"}
+{"timestamp_utc": "2026-09-20T21:34:17.533692+00:00", "event": "validation_threshold_frozen", "experiment_id": "b_minus_occupied_temporal", "threshold": 0.3149700462818146}
+{"timestamp_utc": "2026-09-20T21:34:17.734349+00:00", "event": "fit_completed", "experiment_id": "b_minus_occupied_temporal", "fit_seconds": 1.3118818999791984}
+{"timestamp_utc": "2026-09-20T21:34:17.757350+00:00", "event": "fit_started", "experiment_id": "building_type_temporal", "training_rows": 159533}
+{"timestamp_utc": "2026-09-20T21:34:17.917410+00:00", "event": "validation_threshold_frozen", "experiment_id": "building_type_temporal", "threshold": 0.2714024782180786}
+{"timestamp_utc": "2026-09-20T21:34:18.024791+00:00", "event": "fit_completed", "experiment_id": "building_type_temporal", "fit_seconds": 0.14761109999381006}
+{"timestamp_utc": "2026-09-20T21:34:18.049425+00:00", "event": "fit_started", "experiment_id": "arrival_size_temporal", "training_rows": 159533}
+{"timestamp_utc": "2026-09-20T21:34:18.191152+00:00", "event": "validation_threshold_frozen", "experiment_id": "arrival_size_temporal", "threshold": 0.7691143751144409}
+{"timestamp_utc": "2026-09-20T21:34:18.296786+00:00", "event": "fit_completed", "experiment_id": "arrival_size_temporal", "fit_seconds": 0.12935830000787973}
+{"timestamp_utc": "2026-09-20T21:34:18.406071+00:00", "event": "paired_bootstrap_started", "experiment_id": "b_minus_occupied_random", "repeats": 10000}
+{"timestamp_utc": "2026-09-20T21:34:28.862754+00:00", "event": "paired_bootstrap_completed", "experiment_id": "b_minus_occupied_random"}
+{"timestamp_utc": "2026-09-20T21:34:28.862754+00:00", "event": "paired_bootstrap_started", "experiment_id": "b_minus_occupied_temporal", "repeats": 10000}
+{"timestamp_utc": "2026-09-20T21:34:38.762309+00:00", "event": "paired_bootstrap_completed", "experiment_id": "b_minus_occupied_temporal"}
+{"timestamp_utc": "2026-09-20T21:34:38.762309+00:00", "event": "paired_bootstrap_started", "experiment_id": "building_type_temporal", "repeats": 10000}
+{"timestamp_utc": "2026-09-20T21:34:45.501380+00:00", "event": "paired_bootstrap_completed", "experiment_id": "building_type_temporal"}
+{"timestamp_utc": "2026-09-20T21:34:45.502379+00:00", "event": "paired_bootstrap_started", "experiment_id": "arrival_size_temporal", "repeats": 10000}
+{"timestamp_utc": "2026-09-20T21:34:52.187441+00:00", "event": "paired_bootstrap_completed", "experiment_id": "arrival_size_temporal"}
+{"timestamp_utc": "2026-09-20T21:34:52.188492+00:00", "event": "partially_paired_bootstrap_started", "experiment_id": "b_minus_occupied_random_minus_temporal", "repeats": 10000}
+{"timestamp_utc": "2026-09-20T21:35:03.189429+00:00", "event": "all_uncertainty_completed", "experiment_id": "diagnostics"}

@@ -1,0 +1,109 @@
+{
+  "record_type": "complete_study_execution",
+  "status": "complete",
+  "started_at_utc": "2026-09-20T21:02:48.718985+00:00",
+  "base_git_commit": "1c104aeae925301a531ad74ca92ae8f59ca0078a",
+  "code_and_config_sha256": {
+    "config/analysis.yaml": "3e9721c0257b17c6167f824e81368a3839aa986b79c50e11ea846f4a97ce7a3a",
+    "config/feature_policy.yaml": "b7465acb3066b8607ec05206f939efc448a4d33ba19597afda94ed26ea5221ff",
+    "config/review_experiments.yaml": "98801fee9e608a1b999c515c67515c650c35721e5357391bd2e6626f43fbbe8b",
+    "pyproject.toml": "696d3109208336cb162c13565f3137a6d90b137b4bfe7eabe7512da8ec57fccb",
+    "scripts/01_acquire_data.py": "b91812357fd223066ed1291ca5447fa09d64f0d983e60ebb607491fa03f092ce",
+    "scripts/02_audit_data.py": "039065f5cb577c9cddda121eb07f201f01e30e6e8d40bf0d5fe153c742a7a9c7",
+    "scripts/03_build_cohort.py": "d0b94b368cfbc1fde74eac7988082a11245fdc9020d94551a449ae2e73895f96",
+    "scripts/04_run_models.py": "73ed723704957440acbe189cd338f022484ff06262a01f2c50980cebeeda855e",
+    "scripts/05_run_random_split_stability.py": "e1471be815087c5c5a71006ab3e82808458de443cb1d0d5b9970054c58a0f55a",
+    "scripts/05_run_temporal_robustness.py": "b151d9e09e2ce0da3acf210bda8b83150388480ab9d93aaedd3bf955980735ab",
+    "scripts/06_build_report.py": "fbed699dc5afb58630ca2836e242c29f6054f40e536025d0a8c42071ba3a4dad",
+    "scripts/07_render_report.py": "f947f940326b23a61f6e1345f94cfd2fe2896d65c5fa3500da7e8f8df9d3936f",
+    "scripts/08_run_review_experiments.py": "079cb9735e68869a3067a45a137053ca51e1dd17a64f55af67b0460aba7a54ca",
+    "src/fireml/__init__.py": "887dafcfec1f286fe6423431774e966b41d375f9a608948bfde4641c9495f216",
+    "src/fireml/acquire.py": "dbb90157eaccb7692982acd4d01a5e09cc4fe80ad4352a6d28cc06b82ce9e5fe",
+    "src/fireml/audit.py": "f72a2a303dba9e5e02e15f24a6b19a597c0440e256a0694b1fd2f6f778638707",
+    "src/fireml/cohort.py": "c874b9d4b90d83fde10bf3d262f1636fa920ee5dec1c8e608858063d4a98977a",
+    "src/fireml/config.py": "6d309503299768206193a8299068568ab18a3003b6b98be1ca16c1f25d831b09",
+    "src/fireml/drift.py": "71b59b0b4c26b7afc17170d502451f68e3bd8d3176fb92de9bb258b84f7f9779",
+    "src/fireml/evaluation.py": "c4678a93a4e9924318d4b860cabe5d56644223adba571ed45e119af839799b9e",
+    "src/fireml/features.py": "c2b12be221d5bab4e1e36fbc92eb1d4b322b5f500d17a2d0d18960eb49f9ada9",
+    "src/fireml/interpretability.py": "c7eb2bb5ae91952c2bfac110e3e531a6b22e4ab377ebabf4ca7abb9e1be7587d",
+    "src/fireml/modelling.py": "bece6ff9a2897658531059e6e8d4c39113fe9ce5400703fafa08e16bbad6818c",
+    "src/fireml/preprocessing.py": "ab40cb555b0684b90aea5553439d4a284691b0ccfb18751d356094034546a21b",
+    "src/fireml/reporting.py": "62e986ffa014fdc40ed906df547388e288143df68ae700031c5c39e16685f22b",
+    "src/fireml/review_experiments.py": "93a2e34c4345e66d9e9660b07b009808257d2b90302ffe80097338ca81dcfd75",
+    "src/fireml/review_uncertainty.py": "085e1f55017bf2911b0d5d615ec6f634b8ce65095fc690bc4f45bef36e471971",
+    "src/fireml/robustness.py": "deb54147aabd542b73aaaa31fc162fa27ae3c45c1b1476b9a834c46ea0f1df1a",
+    "src/fireml/splits.py": "c742fb28497ec2afda41e0d379abd1e6961798950393d97b433760e5e90504cf",
+    "src/fireml/target.py": "045bf9c3d0e42e14fbe77070e73bee108547e7c8c127c09da5b4b3917241899c",
+    "src/fireml/uncertainty.py": "5b5f5a3198b9d85eafd39a68889938068654fb134136a706cc422e8d523902b6"
+  },
+  "stages": [
+    {
+      "name": "source import/cache",
+      "started_at_utc": "2026-09-20T21:02:48.762277+00:00",
+      "status": "complete",
+      "finished_at_utc": "2026-09-20T21:02:48.820795+00:00"
+    },
+    {
+      "name": "audit",
+      "started_at_utc": "2026-09-20T21:02:48.820795+00:00",
+      "status": "complete",
+      "finished_at_utc": "2026-09-20T21:02:55.390682+00:00"
+    },
+    {
+      "name": "cohort",
+      "started_at_utc": "2026-09-20T21:02:55.391682+00:00",
+      "status": "complete",
+      "finished_at_utc": "2026-09-20T21:02:56.437700+00:00"
+    },
+    {
+      "name": "data checksums",
+      "started_at_utc": "2026-09-20T21:02:56.438700+00:00",
+      "status": "complete",
+      "finished_at_utc": "2026-09-20T21:02:56.475717+00:00"
+    },
+    {
+      "name": "core model selection and fitting",
+      "started_at_utc": "2026-09-20T21:02:56.476661+00:00",
+      "status": "complete",
+      "finished_at_utc": "2026-09-20T21:30:37.650411+00:00"
+    },
+    {
+      "name": "core uncertainty",
+      "started_at_utc": "2026-09-20T21:30:37.651410+00:00",
+      "status": "complete",
+      "finished_at_utc": "2026-09-20T21:32:26.666467+00:00"
+    },
+    {
+      "name": "grouped permutation",
+      "started_at_utc": "2026-09-20T21:32:26.667466+00:00",
+      "status": "complete",
+      "finished_at_utc": "2026-09-20T21:33:21.718810+00:00"
+    },
+    {
+      "name": "temporal and split robustness",
+      "started_at_utc": "2026-09-20T21:33:21.718810+00:00",
+      "status": "complete",
+      "finished_at_utc": "2026-09-20T21:34:12.795573+00:00"
+    },
+    {
+      "name": "diagnostic fits",
+      "started_at_utc": "2026-09-20T21:34:12.795573+00:00",
+      "status": "complete",
+      "finished_at_utc": "2026-09-20T21:34:18.367069+00:00"
+    },
+    {
+      "name": "diagnostic uncertainty",
+      "started_at_utc": "2026-09-20T21:34:18.368070+00:00",
+      "status": "complete",
+      "finished_at_utc": "2026-09-20T21:35:03.190430+00:00"
+    },
+    {
+      "name": "reports and figures",
+      "started_at_utc": "2026-09-20T21:35:03.191430+00:00",
+      "status": "complete",
+      "finished_at_utc": "2026-09-20T21:35:08.561215+00:00"
+    }
+  ],
+  "interpretation": "A fresh computation on previously examined periods; not new prospective validation.",
+  "finished_at_utc": "2026-09-20T21:35:08.562211+00:00"
+}

@@ -1,0 +1,31 @@
+{
+  "record_type": "report_render_environment",
+  "rendered_at_utc": "2026-09-20T21:38:33.454636+00:00",
+  "renderer_source_sha256": "ee1c6c091b0da2affa4ce53cee9d8b0d6e07b36d8b5d8cf8eaaf0656afefbc6d",
+  "python": "3.12.14",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "packages": {
+    "numpy": "2.5.1",
+    "pandas": "3.0.5",
+    "pyarrow": "25.0.0",
+    "scikit-learn": "1.9.0",
+    "scipy": "1.18.0",
+    "matplotlib": "3.11.1",
+    "PyYAML": "6.0.3"
+  },
+  "scope": "Rendering saved artifacts only. Recomputes confusion/calibration and table summaries from saved predictions/results; no data acquisition, model fitting, bootstrap or permutation analysis. These versions are not training provenance.",
+  "input_receipts": {
+    "outputs/metrics/runtime_environment.json": {
+      "sha256": "1e04b706574253219fa22da2e996d1c7f4403c79a176665c1f1332eed6921ea9",
+      "role": "analysis input receipt"
+    },
+    "outputs/metrics/data_archive_manifest.json": {
+      "sha256": "52d807c20c8db00a4a7fd56f339f22ef421362ca6fb0274db72cfa2a477565de",
+      "role": "analysis input receipt"
+    },
+    "outputs/metrics/model_selection.json": {
+      "sha256": "7efdcd267f2a16bd254069ac1d7b9b91a418fac62b04f0204bf15c3c44a81c28",
+      "role": "analysis input receipt"
+    }
+  }
+}

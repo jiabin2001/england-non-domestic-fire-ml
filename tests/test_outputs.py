@@ -90,6 +90,7 @@ def test_all_figures_have_matching_png_and_pdf_files():
         "05_information_block_comparison", "06_best_temporal_confusion_matrix",
         "07_best_temporal_calibration", "08_building_type_subgroups",
         "09_bootstrap_pr_auc_ci", "10_grouped_permutation_importance",
+        "11_occupancy_ablation", "12_simple_baselines",
     }
     png = sorted((ROOT / "outputs/figures").glob("*.png"))
     pdf = sorted((ROOT / "outputs/figures").glob("*.pdf"))
@@ -111,6 +112,12 @@ def test_new_outputs_are_nonempty_and_manifested():
         "outputs/figures/10_grouped_permutation_importance.pdf",
         "outputs/metrics/model_selection.json",
         "outputs/metrics/data_archive_manifest.json",
+        "outputs/metrics/execution.json",
+        "outputs/diagnostics/performance.csv",
+        "outputs/diagnostics/uncertainty.csv",
+        "outputs/diagnostics/experiment_receipt.json",
+        "outputs/figures/11_occupancy_ablation.png",
+        "outputs/figures/12_simple_baselines.png",
     }
     manifest = set(json.loads(
         (ROOT / "outputs/metrics/output_manifest.json").read_text(encoding="utf-8")

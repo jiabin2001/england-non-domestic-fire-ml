@@ -1,10 +1,44 @@
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pandas as pd
 from sklearn.metrics import average_precision_score
 
 from .config import ROOT, ensure_output_dirs, load_yaml
+
+
+class _PresortedAveragePrecision:
+    """Evaluate exact AP from resampling counts without re-sorting each replicate.
+
+    Scores are grouped only when exactly equal. Integer observation weights are
+    bootstrap multiplicities, so this is the same non-interpolated AP estimand as
+    sklearn on the explicitly resampled observations, up to floating-point order.
+    """
+
+    def __init__(self, labels: np.ndarray, probability: np.ndarray):
+        if labels.ndim != 1 or probability.ndim != 1 or labels.shape != probability.shape:
+            raise ValueError("Labels and probabilities must be matching one-dimensional arrays.")
+        if not np.isin(labels, [0, 1]).all() or np.unique(labels).size != 2:
+            raise ValueError("Average-precision bootstrap requires both binary outcome classes.")
+        if not np.isfinite(probability).all():
+            raise ValueError("Average-precision bootstrap scores must be finite.")
+        self.order = np.argsort(-probability, kind="stable")
+        sorted_probability = probability[self.order]
+        self.starts = np.r_[0, np.flatnonzero(np.diff(sorted_probability) != 0) + 1]
+        self.sorted_labels = labels[self.order]
+
+    def __call__(self, multiplicities: np.ndarray) -> float:
+        weights = multiplicities[self.order]
+        group_total = np.add.reduceat(weights, self.starts)
+        group_positive = np.add.reduceat(weights * self.sorted_labels, self.starts)
+        cumulative_total = np.cumsum(group_total, dtype=float)
+        precision = np.divide(
+            np.cumsum(group_positive, dtype=float), cumulative_total,
+            out=np.zeros_like(cumulative_total), where=cumulative_total > 0,
+        )
+        return float(np.dot(group_positive, precision) / group_positive.sum())
 
 
 def stratified_resample_indices(
@@ -38,10 +72,11 @@ def stratified_bootstrap_pr_auc(
         raise ValueError("Labels and probabilities must have identical shapes.")
     if repeats < 1:
         raise ValueError("Bootstrap repeats must be positive.")
+    score = _PresortedAveragePrecision(labels, probabilities)
     draws = np.empty(repeats, dtype=float)
     for repeat in range(repeats):
         indices = stratified_resample_indices(labels, rng)
-        draws[repeat] = average_precision_score(labels[indices], probabilities[indices])
+        draws[repeat] = score(np.bincount(indices, minlength=len(labels)))
     return draws
 
 
@@ -138,6 +173,8 @@ def partially_paired_bootstrap_pr_auc(
 
     random_probability = random_predictions["probability"].to_numpy(dtype=float, copy=True)
     temporal_probability = temporal_predictions["probability"].to_numpy(dtype=float, copy=True)
+    random_score = _PresortedAveragePrecision(random_y, random_probability)
+    temporal_score = _PresortedAveragePrecision(temporal_y, temporal_probability)
     random_draws = np.empty(repeats, dtype=float)
     temporal_draws = np.empty(repeats, dtype=float)
     for repeat in range(repeats):
@@ -158,12 +195,8 @@ def partially_paired_bootstrap_pr_auc(
                 )
         random_indices = np.concatenate(random_parts)
         temporal_indices = np.concatenate(temporal_parts)
-        random_draws[repeat] = average_precision_score(
-            random_y[random_indices], random_probability[random_indices]
-        )
-        temporal_draws[repeat] = average_precision_score(
-            temporal_y[temporal_indices], temporal_probability[temporal_indices]
-        )
+        random_draws[repeat] = random_score(np.bincount(random_indices, minlength=len(random_y)))
+        temporal_draws[repeat] = temporal_score(np.bincount(temporal_indices, minlength=len(temporal_y)))
     return random_draws, temporal_draws
 
 
@@ -172,6 +205,8 @@ def build_bootstrap_ci_table(
     temporal_predictions: pd.DataFrame,
     repeats: int = 100000,
     seed: int = 20260731,
+    *,
+    model_labels: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """Summarise fixed-model average-precision uncertainty for overlapping holdouts."""
     required = {"LARGER_FIRE", "probability"}
@@ -181,6 +216,14 @@ def build_bootstrap_ci_table(
             raise ValueError(f"{design} predictions missing columns: {sorted(missing)}")
 
     overlap = holdout_overlap_summary(random_predictions, temporal_predictions)
+    if model_labels is None:
+        model_labels = {design: "validation-selected pipeline" for design in ("random", "temporal")}
+    if set(model_labels) != {"random", "temporal"}:
+        raise ValueError("Bootstrap model_labels must describe both random and temporal pipelines.")
+    difference_label = (
+        model_labels["random"] if model_labels["random"] == model_labels["temporal"]
+        else f"random: {model_labels['random']}; temporal: {model_labels['temporal']}"
+    )
     rng = np.random.default_rng(seed)
     random_y = random_predictions["LARGER_FIRE"].to_numpy(dtype=int, copy=True)
     random_probability = random_predictions["probability"].to_numpy(dtype=float, copy=True)
@@ -206,13 +249,14 @@ def build_bootstrap_ci_table(
             "estimand": estimand,
             "design": design,
             "block": "B",
-            "model": "validation-selected XGBoost",
+            "model": model_labels.get(design, difference_label),
             "point_estimate": point,
             "ci_lower_95": float(lower),
             "ci_upper_95": float(upper),
             "bootstrap_repeats": repeats,
             "bootstrap_seed": seed,
             "bootstrap_method": method,
+            "bootstrap_score_evaluation": "exact tied-score weighted AP with presorted scores",
             **overlap,
         }
 
@@ -287,11 +331,24 @@ def run_uncertainty_analysis() -> dict[str, pd.DataFrame]:
     temporal_predictions = pd.read_parquet(
         ROOT / "outputs/metrics/predictions_temporal_block_B.parquet"
     )
+    selection = json.loads(
+        (ROOT / "outputs/metrics/model_selection.json").read_text(encoding="utf-8")
+    )
+    family_labels = {
+        "logistic_regression": "Logistic Regression",
+        "random_forest": "Random Forest",
+        "xgboost": "XGBoost",
+    }
+    model_labels = {}
+    for design in ("random", "temporal"):
+        family = selection["selected_family_by_block"][design]["B"]
+        model_labels[design] = f"validation-selected {family_labels.get(family, family)}"
     bootstrap = build_bootstrap_ci_table(
         random_predictions,
         temporal_predictions,
         repeats=int(cfg["bootstrap_repeats"]),
         seed=int(cfg["bootstrap_seed"]),
+        model_labels=model_labels,
     )
     bootstrap.to_csv(
         ROOT / "outputs/tables/bootstrap_confidence_intervals.csv", index=False

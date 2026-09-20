@@ -1,0 +1,44 @@
+{
+  "record_type": "post_review_fixed_model_uncertainty",
+  "completed_at_utc": "2026-09-20T21:35:03.182331+00:00",
+  "bootstrap_repeats": 10000,
+  "bootstrap_seed": 20260921,
+  "elapsed_seconds": 44.77608139999211,
+  "method_notes": "Average precision is sklearn's non-interpolated average_precision_score. Intervals are two-sided 95% percentile bootstrap intervals conditional on the fitted models and observed class counts. Same-test model comparisons align SOURCE_ROW_ID and resample positive and negative records separately, using the same sampled records for both models; differences are new minus reference. Random-minus-temporal comparisons additionally fix overlap membership: shared records are sampled jointly within outcome class, and design-only records are sampled independently. Thus test sizes, prevalences, and overlap counts stay fixed. AP calculations group tied scores before accumulating precision; bootstrap multiplicities are exact observation weights, not score bins. Difference intervals come directly from paired differences, not from comparing separate AP intervals. No model refitting, hyperparameter selection, threshold selection, year-level resampling, or multiplicity adjustment is included. These exploratory post-review analyses use previously examined test periods and do not create a new untouched or prospective validation set.",
+  "interpretation": "post-review exploratory diagnostics; the study holdout periods have already been inspected",
+  "input_sha256": {
+    "predictions/b_minus_occupied_random_test.parquet": "f3f7891e5b477651059c4ff67bb31b98c040162bf4034323d967a4b788d12600",
+    "predictions/b_minus_occupied_temporal_test.parquet": "78d81d5b8b45f1c46d0e3bcf991b1767713c34c4286e041c08c7569ded50258f",
+    "predictions/building_type_temporal_test.parquet": "a4dd189dbc029fa2e515bbb49d87e988f13b8f24b5f2aac2bad9efd65410cccb",
+    "predictions/arrival_size_temporal_test.parquet": "64dc986dff54faa6e7d0b21fe165f1d7716d031878018d1c2ee482328c8aead7",
+    "outputs/metrics/predictions_random_block_B.parquet": "09b33c43a465c0e9cb0632d8e049ee126284c59112ddc7d22c507ef6a7fe7204",
+    "outputs/metrics/predictions_temporal_block_B.parquet": "d401c80886abd6a5fe0eeb1066441010f2111b207cd8790e00b00966ab5aabc3",
+    "outputs/metrics/predictions_temporal_block_C.parquet": "2c473aedfd1fac644523aa8f95ebeaa343df346e21ffd9ff3b30103a3f658ebc"
+  },
+  "code_sha256": "085e1f55017bf2911b0d5d615ec6f634b8ce65095fc690bc4f45bef36e471971",
+  "output_sha256": "2bcc4b6fd9fd30484339c4865401d826edb866fc745c1c3fb1944733dd738b13",
+  "runtime_environment": {
+    "record_type": "fixed_model_uncertainty_environment",
+    "python": "3.12.14",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "pandas": "3.0.5",
+    "numpy": "2.5.1",
+    "scikit_learn": "1.9.0",
+    "xgboost": "3.3.0",
+    "xgboost_device": "not_used",
+    "n_jobs": 1,
+    "packages": {
+      "numpy": "2.5.1",
+      "pandas": "3.0.5",
+      "pyarrow": "25.0.0",
+      "odfpy": "1.4.1",
+      "scikit-learn": "1.9.0",
+      "xgboost": "3.3.0",
+      "scipy": "1.18.0",
+      "matplotlib": "3.11.1",
+      "joblib": "1.5.3",
+      "PyYAML": "6.0.3",
+      "pytest": "9.1.1"
+    }
+  }
+}

@@ -27,7 +27,7 @@ excluded_main_years:
 temporal_validation_years: 2
 temporal_test_years: 2
 random_seed: 20260801
-# Consecutive split seeds fixed before running the 17 added assignments.
+# Consecutive split seeds for the assignment-sensitivity analysis.
 # The estimator RNG remains fixed at random_seed throughout this sensitivity analysis.
 random_stability_seeds:
   - 20260801

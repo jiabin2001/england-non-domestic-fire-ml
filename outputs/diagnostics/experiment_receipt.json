@@ -1,0 +1,486 @@
+{
+  "record_type": "post_review_exploratory_experiments",
+  "status": "fits_completed",
+  "started_at_utc": "2026-09-20T21:34:14.201965+00:00",
+  "interpretation": "post-review exploratory diagnostics; the study holdout periods have already been inspected",
+  "identity": {
+    "input_sha256": {
+      "config/review_experiments.yaml": "98801fee9e608a1b999c515c67515c650c35721e5357391bd2e6626f43fbbe8b",
+      "config/analysis.yaml": "3e9721c0257b17c6167f824e81368a3839aa986b79c50e11ea846f4a97ce7a3a",
+      "data/raw/source_metadata.json": "8cd3ff71d339c336170467e3ee92613e8a28af3a8f62833383b6d3b748c9f706",
+      "data/raw/Other_building_fires_dataset.ods": "560e5c1a18731cf8189b28471f6813675d6f95f447d680ec5603d9bb97718595",
+      "data/processed/analysis_cohort.parquet": "d595b7a5a161646dbc1068383c8137c497b7eb7d6df64c1b737799a1d9d583f3",
+      "outputs/tables/split_assignments.csv": "2d91b3ff554f089a380728e312bb62753848ec6b7c87d534f57dbd251e5fe774",
+      "outputs/metrics/model_selection.json": "7efdcd267f2a16bd254069ac1d7b9b91a418fac62b04f0204bf15c3c44a81c28",
+      "outputs/metrics/audit_receipt.json": "8a6dbddcd7a6572f975d64bbc6302cea36678ef46b7b4e22c0a37d978efe2a7a",
+      "outputs/metrics/data_archive_manifest.json": "52d807c20c8db00a4a7fd56f339f22ef421362ca6fb0274db72cfa2a477565de",
+      "outputs/tables/random_validation_performance.csv": "a7d3ce59fe6611467751426293ab3ede356152dac0571acef93c0c9599adf3c2",
+      "outputs/tables/temporal_validation_performance.csv": "74e54baed412546489d0217a10545913c58f02f0b98ecb9ee660487e0dae4e47",
+      "outputs/metrics/predictions_random_block_B.parquet": "09b33c43a465c0e9cb0632d8e049ee126284c59112ddc7d22c507ef6a7fe7204",
+      "outputs/metrics/predictions_temporal_block_B.parquet": "d401c80886abd6a5fe0eeb1066441010f2111b207cd8790e00b00966ab5aabc3",
+      "outputs/metrics/predictions_temporal_block_C.parquet": "2c473aedfd1fac644523aa8f95ebeaa343df346e21ffd9ff3b30103a3f658ebc"
+    },
+    "code_sha256": {
+      "src/fireml/review_experiments.py": "93a2e34c4345e66d9e9660b07b009808257d2b90302ffe80097338ca81dcfd75",
+      "src/fireml/review_uncertainty.py": "085e1f55017bf2911b0d5d615ec6f634b8ce65095fc690bc4f45bef36e471971",
+      "src/fireml/modelling.py": "bece6ff9a2897658531059e6e8d4c39113fe9ce5400703fafa08e16bbad6818c",
+      "src/fireml/preprocessing.py": "ab40cb555b0684b90aea5553439d4a284691b0ccfb18751d356094034546a21b",
+      "src/fireml/features.py": "c2b12be221d5bab4e1e36fbc92eb1d4b322b5f500d17a2d0d18960eb49f9ada9",
+      "src/fireml/evaluation.py": "c4678a93a4e9924318d4b860cabe5d56644223adba571ed45e119af839799b9e",
+      "src/fireml/uncertainty.py": "5b5f5a3198b9d85eafd39a68889938068654fb134136a706cc422e8d523902b6",
+      "config/feature_policy.yaml": "b7465acb3066b8607ec05206f939efc448a4d33ba19597afda94ed26ea5221ff",
+      "scripts/08_run_review_experiments.py": "079cb9735e68869a3067a45a137053ca51e1dd17a64f55af67b0460aba7a54ca",
+      "pyproject.toml": "696d3109208336cb162c13565f3137a6d90b137b4bfe7eabe7512da8ec57fccb"
+    },
+    "config": {
+      "version": 1,
+      "status": "post-review exploratory diagnostics; the study holdout periods have already been inspected",
+      "output_dir": "outputs/diagnostics",
+      "source_snapshot_policy": "match current core archive manifest and source metadata",
+      "xgboost_device": "cuda",
+      "baseline_logistic_c": 1.0,
+      "bootstrap_repeats": 10000,
+      "bootstrap_seed": 20260921
+    },
+    "experiment_plan": [
+      {
+        "experiment_id": "b_minus_occupied_random",
+        "design": "random",
+        "model": "xgboost",
+        "columns": [
+          "DAY_OF_WEEK",
+          "DAY_NIGHT",
+          "BUILDING_TYPE",
+          "FSO_APPLY",
+          "OCCUPIED_NORMAL",
+          "ALARM_SYSTEM",
+          "SAFETY_SYSTEM",
+          "IGNITION_TO_DISCOVERY",
+          "DISCOVERY_TO_CALL",
+          "ACCIDENTAL_OR_DELIBERATE",
+          "CAUSE_OF_FIRE",
+          "IGNITION_POWER",
+          "SOURCE_OF_IGNITION",
+          "FIRE_START_LOCATION",
+          "ITEM_IGNITED"
+        ],
+        "parameters": {
+          "n_estimators": 200,
+          "learning_rate": 0.1,
+          "max_depth": 6,
+          "min_child_weight": 5,
+          "subsample": 0.8,
+          "colsample_bytree": 0.8
+        },
+        "reference_key": "random_B",
+        "reference_block": "B",
+        "purpose": "Fixed-configuration removal sensitivity for OCCUPIED_TIME"
+      },
+      {
+        "experiment_id": "b_minus_occupied_temporal",
+        "design": "temporal",
+        "model": "xgboost",
+        "columns": [
+          "DAY_OF_WEEK",
+          "DAY_NIGHT",
+          "BUILDING_TYPE",
+          "FSO_APPLY",
+          "OCCUPIED_NORMAL",
+          "ALARM_SYSTEM",
+          "SAFETY_SYSTEM",
+          "IGNITION_TO_DISCOVERY",
+          "DISCOVERY_TO_CALL",
+          "ACCIDENTAL_OR_DELIBERATE",
+          "CAUSE_OF_FIRE",
+          "IGNITION_POWER",
+          "SOURCE_OF_IGNITION",
+          "FIRE_START_LOCATION",
+          "ITEM_IGNITED"
+        ],
+        "parameters": {
+          "n_estimators": 200,
+          "learning_rate": 0.1,
+          "max_depth": 6,
+          "min_child_weight": 5,
+          "subsample": 0.8,
+          "colsample_bytree": 0.8
+        },
+        "reference_key": "temporal_B",
+        "reference_block": "B",
+        "purpose": "Fixed-configuration removal sensitivity for OCCUPIED_TIME"
+      },
+      {
+        "experiment_id": "building_type_temporal",
+        "design": "temporal",
+        "model": "logistic_regression",
+        "columns": [
+          "BUILDING_TYPE"
+        ],
+        "parameters": {
+          "C": 1.0
+        },
+        "reference_key": "temporal_B",
+        "reference_block": "B",
+        "purpose": "Single-field categorical baseline with fixed C=1.0 and no search; comparison changes information and model family, not a pure feature increment"
+      },
+      {
+        "experiment_id": "arrival_size_temporal",
+        "design": "temporal",
+        "model": "logistic_regression",
+        "columns": [
+          "FIRE_SIZE_ON_ARRIVAL"
+        ],
+        "parameters": {
+          "C": 1.0
+        },
+        "reference_key": "temporal_C",
+        "reference_block": "C",
+        "purpose": "Single-field categorical baseline with fixed C=1.0 and no search; comparison changes information and model family, not a pure feature increment"
+      }
+    ],
+    "estimator_seed": 20260801,
+    "n_jobs": 4,
+    "reference_prediction_checks": {
+      "random_B": {
+        "model": "xgboost",
+        "n": 25814,
+        "average_precision": 0.6566246779018947
+      },
+      "temporal_B": {
+        "model": "xgboost",
+        "n": 25814,
+        "average_precision": 0.640199883921481
+      },
+      "temporal_C": {
+        "model": "xgboost",
+        "n": 25814,
+        "average_precision": 0.9820794954052965
+      }
+    }
+  },
+  "git_head_at_start": "1c104aeae925301a531ad74ca92ae8f59ca0078a",
+  "git_tracked_worktree_status_at_start": "M .github/workflows/tests.yml\n M .gitignore\n M config/analysis.yaml\n M config/feature_policy.yaml\n M data/raw/source_metadata.json\n D outputs/figures/01_study_workflow.pdf\n D outputs/figures/01_study_workflow.png\n D outputs/figures/02_annual_count_prevalence.pdf\n D outputs/figures/02_annual_count_prevalence.png\n D outputs/figures/03_random_vs_temporal_pr_auc.pdf\n D outputs/figures/03_random_vs_temporal_pr_auc.png\n D outputs/figures/04_expanding_window_performance.pdf\n D outputs/figures/04_expanding_window_performance.png\n D outputs/figures/05_information_block_comparison.pdf\n D outputs/figures/05_information_block_comparison.png\n D outputs/figures/06_best_temporal_confusion_matrix.pdf\n D outputs/figures/06_best_temporal_confusion_matrix.png\n D outputs/figures/07_best_temporal_calibration.pdf\n D outputs/figures/07_best_temporal_calibration.png\n D outputs/figures/08_building_type_subgroups.pdf\n D outputs/figures/08_building_type_subgroups.png\n D outputs/figures/09_bootstrap_pr_auc_ci.pdf\n D outputs/figures/09_bootstrap_pr_auc_ci.png\n D outputs/figures/10_grouped_permutation_importance.pdf\n D outputs/figures/10_grouped_permutation_importance.png\n M outputs/metrics/audit_receipt.json\n M outputs/metrics/cohort_receipt.json\n M outputs/metrics/data_archive_manifest.json\n M outputs/metrics/model_selection.json\n D outputs/metrics/output_manifest.json\n M outputs/metrics/runtime_environment.json\n M outputs/tables/annual_incident_prevalence.csv\n M outputs/tables/annual_major_building_type_proportions.csv\n M outputs/tables/baseline_validation_performance.csv\n D outputs/tables/best_temporal_calibration_curve.csv\n D outputs/tables/best_temporal_confusion_matrix.csv\n M outputs/tables/block_comparison.csv\n M outputs/tables/bootstrap_confidence_intervals.csv\n M outputs/tables/building_type_subgroup_performance.csv\n M outputs/tables/category_lifecycle.csv\n M outputs/tables/category_support_by_split.csv\n M outputs/tables/category_support_by_year.csv\n M outputs/tables/cohort_flow.csv\n M outputs/tables/column_inventory.csv\n D outputs/tables/cross_block_split_difference.csv\n M outputs/tables/development_validation_performance.csv\n M outputs/tables/drift_summary.csv\n M outputs/tables/expanding_window_performance.csv\n M outputs/tables/feature_policy.csv\n M outputs/tables/grouped_permutation_importance.csv\n M outputs/tables/hyperparameter_search_results.csv\n M outputs/tables/hyperparameter_stability_summary.csv\n M outputs/tables/missingness_by_year.csv\n M outputs/tables/ods_sheet_inventory.csv\n M outputs/tables/pr_auc_prevalence_context.csv\n M outputs/tables/random_seed_stability.csv\n D outputs/tables/random_seed_stability_summary.csv\n M outputs/tables/random_to_temporal_difference.csv\n M outputs/tables/random_validation_performance.csv\n M outputs/tables/sensitivity_analysis_results.csv\n M outputs/tables/split_assignments.csv\n M outputs/tables/spread_of_fire_categories.csv\n M outputs/tables/target_mapping.csv\n M outputs/tables/temporal_validation_performance.csv\n M outputs/tables/year_coverage.csv\n M pyproject.toml\n M reports/day1_feasibility.md\n M reports/hyperparameter_plan.md\n D reports/no_rerun_revision.md\n M scripts/01_acquire_data.py\n M scripts/02_audit_data.py\n M scripts/03_build_cohort.py\n M scripts/04_run_models.py\n M scripts/05_run_random_split_stability.py\n M scripts/05_run_temporal_robustness.py\n M scripts/06_build_report.py\n M scripts/07_render_report.py\n M src/fireml/__init__.py\n M src/fireml/acquire.py\n M src/fireml/audit.py\n M src/fireml/cohort.py\n M src/fireml/config.py\n M src/fireml/drift.py\n M src/fireml/evaluation.py\n M src/fireml/features.py\n M src/fireml/interpretability.py\n M src/fireml/modelling.py\n M src/fireml/preprocessing.py\n M src/fireml/reporting.py\n M src/fireml/robustness.py\n M src/fireml/splits.py\n M src/fireml/target.py\n M src/fireml/uncertainty.py\n M tests/conftest.py\n M tests/test_acquire.py\n M tests/test_audit_config.py\n M tests/test_data_integration.py\n M tests/test_feature_schema.py\n M tests/test_modelling.py\n M tests/test_outputs.py\n M tests/test_reporting.py\n M tests/test_uncertainty.py",
+  "training_environment": {
+    "record_type": "model_training_environment",
+    "python": "3.12.14",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "pandas": "3.0.5",
+    "numpy": "2.5.1",
+    "scikit_learn": "1.9.0",
+    "xgboost": "3.3.0",
+    "xgboost_device": "cuda",
+    "n_jobs": 4,
+    "packages": {
+      "numpy": "2.5.1",
+      "pandas": "3.0.5",
+      "pyarrow": "25.0.0",
+      "odfpy": "1.4.1",
+      "scikit-learn": "1.9.0",
+      "xgboost": "3.3.0",
+      "scipy": "1.18.0",
+      "matplotlib": "3.11.1",
+      "joblib": "1.5.3",
+      "PyYAML": "6.0.3",
+      "pytest": "9.1.1"
+    }
+  },
+  "gpu": {
+    "command": [
+      "nvidia-smi",
+      "--query-gpu=name,uuid,driver_version,memory.total",
+      "--format=csv,noheader"
+    ],
+    "output": "NVIDIA GeForce RTX 5090 Laptop GPU, GPU-930837d1-b254-7b66-6754-bb17dc254f58, 592.01, 24463 MiB"
+  },
+  "reference_predictions": {
+    "random_B": {
+      "path": "outputs/metrics/predictions_random_block_B.parquet",
+      "sha256": "09b33c43a465c0e9cb0632d8e049ee126284c59112ddc7d22c507ef6a7fe7204"
+    },
+    "temporal_B": {
+      "path": "outputs/metrics/predictions_temporal_block_B.parquet",
+      "sha256": "d401c80886abd6a5fe0eeb1066441010f2111b207cd8790e00b00966ab5aabc3"
+    },
+    "temporal_C": {
+      "path": "outputs/metrics/predictions_temporal_block_C.parquet",
+      "sha256": "2c473aedfd1fac644523aa8f95ebeaa343df346e21ffd9ff3b30103a3f658ebc"
+    }
+  },
+  "partition_sizes": {
+    "random": {
+      "train": 159533,
+      "validation": 23824,
+      "test": 25814
+    },
+    "temporal": {
+      "train": 159533,
+      "validation": 23824,
+      "test": 25814
+    }
+  },
+  "threshold_rule": "Maximum validation F1; test data do not select settings or thresholds",
+  "experiments": {
+    "b_minus_occupied_random": {
+      "status": "completed",
+      "completed_at_utc": "2026-09-20T21:34:16.082307+00:00",
+      "threshold": 0.34006059169769287,
+      "fit_seconds": 1.3735141000070143,
+      "metrics": [
+        {
+          "experiment_id": "b_minus_occupied_random",
+          "design": "random",
+          "split_role": "validation",
+          "model": "xgboost",
+          "reference_block": "B",
+          "feature_count": 15,
+          "fit_seconds": 1.3735141000070143,
+          "parameters": "{\"colsample_bytree\": 0.8, \"learning_rate\": 0.1, \"max_depth\": 6, \"min_child_weight\": 5, \"n_estimators\": 200, \"subsample\": 0.8}",
+          "n": 23824,
+          "positive_count": 6128,
+          "positive_prevalence": 0.25721961047683006,
+          "pr_auc": 0.6470899392605475,
+          "roc_auc": 0.8507389652896141,
+          "recall": 0.7266644908616188,
+          "precision": 0.5779364049318624,
+          "f1": 0.6438227427166919,
+          "balanced_accuracy": 0.7714470736405743,
+          "brier_score": 0.13018364955304956,
+          "threshold": 0.34006059169769287,
+          "tn": 14444,
+          "fp": 3252,
+          "fn": 1675,
+          "tp": 4453
+        },
+        {
+          "experiment_id": "b_minus_occupied_random",
+          "design": "random",
+          "split_role": "test",
+          "model": "xgboost",
+          "reference_block": "B",
+          "feature_count": 15,
+          "fit_seconds": 1.3735141000070143,
+          "parameters": "{\"colsample_bytree\": 0.8, \"learning_rate\": 0.1, \"max_depth\": 6, \"min_child_weight\": 5, \"n_estimators\": 200, \"subsample\": 0.8}",
+          "n": 25814,
+          "positive_count": 6640,
+          "positive_prevalence": 0.257224761757186,
+          "pr_auc": 0.652251789263307,
+          "roc_auc": 0.8533284161471169,
+          "recall": 0.7280120481927711,
+          "precision": 0.5799640071985603,
+          "f1": 0.6456093489148581,
+          "balanced_accuracy": 0.772710519767607,
+          "brier_score": 0.12924540779460184,
+          "threshold": 0.34006059169769287,
+          "tn": 15673,
+          "fp": 3501,
+          "fn": 1806,
+          "tp": 4834
+        }
+      ],
+      "actual_model_device": "cuda:0",
+      "booster_config_sha256": "9993203598c25d855d9b06c63afda7e2cd19de8c1519a1ced1551a3f16358364",
+      "artifact_sha256": {
+        "models/b_minus_occupied_random.joblib": "80713e52b2c2c3dfcf94c26f1a803b2e396da58fe67193ff65ff21c6d3285c37",
+        "predictions/b_minus_occupied_random_validation.parquet": "59766056f40e8c0d2fb10eb6a3c89df6ac3f2e760a7b854fbb98aa994dbd5c8a",
+        "predictions/b_minus_occupied_random_test.parquet": "f3f7891e5b477651059c4ff67bb31b98c040162bf4034323d967a4b788d12600"
+      }
+    },
+    "b_minus_occupied_temporal": {
+      "status": "completed",
+      "completed_at_utc": "2026-09-20T21:34:17.734349+00:00",
+      "threshold": 0.3149700462818146,
+      "fit_seconds": 1.3118818999791984,
+      "metrics": [
+        {
+          "experiment_id": "b_minus_occupied_temporal",
+          "design": "temporal",
+          "split_role": "validation",
+          "model": "xgboost",
+          "reference_block": "B",
+          "feature_count": 15,
+          "fit_seconds": 1.3118818999791984,
+          "parameters": "{\"colsample_bytree\": 0.8, \"learning_rate\": 0.1, \"max_depth\": 6, \"min_child_weight\": 5, \"n_estimators\": 200, \"subsample\": 0.8}",
+          "n": 23824,
+          "positive_count": 7085,
+          "positive_prevalence": 0.29738918737407655,
+          "pr_auc": 0.6627674043082915,
+          "roc_auc": 0.8402793513413606,
+          "recall": 0.7583627381792519,
+          "precision": 0.5897914379802415,
+          "f1": 0.6635381290521766,
+          "balanced_accuracy": 0.767555823955508,
+          "brier_score": 0.1446372025498255,
+          "threshold": 0.3149700462818146,
+          "tn": 13002,
+          "fp": 3737,
+          "fn": 1712,
+          "tp": 5373
+        },
+        {
+          "experiment_id": "b_minus_occupied_temporal",
+          "design": "temporal",
+          "split_role": "test",
+          "model": "xgboost",
+          "reference_block": "B",
+          "feature_count": 15,
+          "fit_seconds": 1.3118818999791984,
+          "parameters": "{\"colsample_bytree\": 0.8, \"learning_rate\": 0.1, \"max_depth\": 6, \"min_child_weight\": 5, \"n_estimators\": 200, \"subsample\": 0.8}",
+          "n": 25814,
+          "positive_count": 6850,
+          "positive_prevalence": 0.2653598822344464,
+          "pr_auc": 0.6386985686156484,
+          "roc_auc": 0.838319797634242,
+          "recall": 0.7078832116788322,
+          "precision": 0.5757539776775112,
+          "f1": 0.6350183342063908,
+          "balanced_accuracy": 0.7597367967274145,
+          "brier_score": 0.13721570959494397,
+          "threshold": 0.3149700462818146,
+          "tn": 15391,
+          "fp": 3573,
+          "fn": 2001,
+          "tp": 4849
+        }
+      ],
+      "actual_model_device": "cuda:0",
+      "booster_config_sha256": "ebe5da6b1a0c218bb34a543524893224282b81e0e15573280b9fc4e2f3484189",
+      "artifact_sha256": {
+        "models/b_minus_occupied_temporal.joblib": "b7acd38639213c787efd0566ac2ed2b717e8652debbd8fd7020bc5a824cd2d31",
+        "predictions/b_minus_occupied_temporal_validation.parquet": "90e0391d03c1c4b525915e98fbaa19af2a0a85e09f4f64a4ec552980e7c38424",
+        "predictions/b_minus_occupied_temporal_test.parquet": "78d81d5b8b45f1c46d0e3bcf991b1767713c34c4286e041c08c7569ded50258f"
+      }
+    },
+    "building_type_temporal": {
+      "status": "completed",
+      "completed_at_utc": "2026-09-20T21:34:18.024791+00:00",
+      "threshold": 0.2714024782180786,
+      "fit_seconds": 0.14761109999381006,
+      "metrics": [
+        {
+          "experiment_id": "building_type_temporal",
+          "design": "temporal",
+          "split_role": "validation",
+          "model": "logistic_regression",
+          "reference_block": "B",
+          "feature_count": 1,
+          "fit_seconds": 0.14761109999381006,
+          "parameters": "{\"C\": 1.0}",
+          "n": 23824,
+          "positive_count": 7085,
+          "positive_prevalence": 0.29738918737407655,
+          "pr_auc": 0.55102152478519,
+          "roc_auc": 0.7843662232094785,
+          "recall": 0.7057163020465773,
+          "precision": 0.5434782608695652,
+          "f1": 0.6140620202640467,
+          "balanced_accuracy": 0.7274026279932391,
+          "brier_score": 0.16379600026285263,
+          "threshold": 0.2714024782180786,
+          "tn": 12539,
+          "fp": 4200,
+          "fn": 2085,
+          "tp": 5000
+        },
+        {
+          "experiment_id": "building_type_temporal",
+          "design": "temporal",
+          "split_role": "test",
+          "model": "logistic_regression",
+          "reference_block": "B",
+          "feature_count": 1,
+          "fit_seconds": 0.14761109999381006,
+          "parameters": "{\"C\": 1.0}",
+          "n": 25814,
+          "positive_count": 6850,
+          "positive_prevalence": 0.2653598822344464,
+          "pr_auc": 0.5173179159412711,
+          "roc_auc": 0.777942863697178,
+          "recall": 0.6467153284671533,
+          "precision": 0.5158961220449517,
+          "f1": 0.5739457148409665,
+          "balanced_accuracy": 0.7137552596775758,
+          "brier_score": 0.15590445306788028,
+          "threshold": 0.2714024782180786,
+          "tn": 14807,
+          "fp": 4157,
+          "fn": 2420,
+          "tp": 4430
+        }
+      ],
+      "actual_model_device": "cpu (LogisticRegression)",
+      "booster_config_sha256": null,
+      "artifact_sha256": {
+        "models/building_type_temporal.joblib": "bc3b7f05939e088085bd2781b95ee221ae6837ae23ba98a811696d9e34c6851c",
+        "predictions/building_type_temporal_validation.parquet": "4d59d385af960dc91f5895f6c7b99c3df46dd06462cfe6fb44d6d826d8f02ae6",
+        "predictions/building_type_temporal_test.parquet": "a4dd189dbc029fa2e515bbb49d87e988f13b8f24b5f2aac2bad9efd65410cccb"
+      }
+    },
+    "arrival_size_temporal": {
+      "status": "completed",
+      "completed_at_utc": "2026-09-20T21:34:18.296786+00:00",
+      "threshold": 0.7691143751144409,
+      "fit_seconds": 0.12935830000787973,
+      "metrics": [
+        {
+          "experiment_id": "arrival_size_temporal",
+          "design": "temporal",
+          "split_role": "validation",
+          "model": "logistic_regression",
+          "reference_block": "C",
+          "feature_count": 1,
+          "fit_seconds": 0.12935830000787973,
+          "parameters": "{\"C\": 1.0}",
+          "n": 23824,
+          "positive_count": 7085,
+          "positive_prevalence": 0.29738918737407655,
+          "pr_auc": 0.9629340904092467,
+          "roc_auc": 0.9821964080267082,
+          "recall": 0.9172900494001411,
+          "precision": 0.997544128933231,
+          "f1": 0.955735294117647,
+          "balanced_accuracy": 0.9581670988980513,
+          "brier_score": 0.02341984261255548,
+          "threshold": 0.7691143751144409,
+          "tn": 16723,
+          "fp": 16,
+          "fn": 586,
+          "tp": 6499
+        },
+        {
+          "experiment_id": "arrival_size_temporal",
+          "design": "temporal",
+          "split_role": "test",
+          "model": "logistic_regression",
+          "reference_block": "C",
+          "feature_count": 1,
+          "fit_seconds": 0.12935830000787973,
+          "parameters": "{\"C\": 1.0}",
+          "n": 25814,
+          "positive_count": 6850,
+          "positive_prevalence": 0.2653598822344464,
+          "pr_auc": 0.9626575879470096,
+          "roc_auc": 0.9834525039375415,
+          "recall": 0.9216058394160584,
+          "precision": 0.996527229676401,
+          "f1": 0.9576033371255215,
+          "balanced_accuracy": 0.960222873304317,
+          "brier_score": 0.02017238645289792,
+          "threshold": 0.7691143751144409,
+          "tn": 18942,
+          "fp": 22,
+          "fn": 537,
+          "tp": 6313
+        }
+      ],
+      "actual_model_device": "cpu (LogisticRegression)",
+      "booster_config_sha256": null,
+      "artifact_sha256": {
+        "models/arrival_size_temporal.joblib": "db0a19cae88d3f7621c7fbc628d60f8f43d3d690bcb93bb85e7b90842aebd366",
+        "predictions/arrival_size_temporal_validation.parquet": "e3f943ff295e71b4839f30e4a973a90b0e6515caa468748453d5927a3f7ffb55",
+        "predictions/arrival_size_temporal_test.parquet": "64dc986dff54faa6e7d0b21fe165f1d7716d031878018d1c2ee482328c8aead7"
+      }
+    }
+  },
+  "completed_at_utc": "2026-09-20T21:34:18.360174+00:00",
+  "performance_sha256": "e639f85bd019d37a8ed75f851c5d046eb544543904f4d80ee51b561c3426d806"
+}

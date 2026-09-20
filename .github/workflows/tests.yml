@@ -25,5 +25,5 @@ jobs:
         run: python -m pip install -e ".[test]"
       - name: Run tests without research data or model training
         run: python -m pytest -q -m "not artifact and not integration"
-      - name: Check historical research artifacts remain unchanged
+      - name: Check unit tests do not modify research artifacts
         run: git diff --exit-code -- outputs data/raw/source_metadata.json

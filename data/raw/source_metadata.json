@@ -3,7 +3,8 @@
   "source_page_url": "https://www.gov.uk/government/statistics/fire-statistics-incident-level-datasets",
   "guidance_url": "https://www.gov.uk/government/statistics/fire-statistics-incident-level-datasets/other-building-fires-dataset-guidance",
   "download_url": "https://assets.publishing.service.gov.uk/media/6a5e7a52c7c34404041b4663/Other_building_fires_dataset.ods",
-  "download_recorded_at_utc": "2026-07-30T19:21:56.590944+00:00",
+  "download_timestamp_utc": "2026-09-20T20:46:44.568462+00:00",
+  "download_recorded_at_utc": "2026-09-20T20:55:40.884511+00:00",
   "official_page_updated": "2026-07-22",
   "file_name": "Other_building_fires_dataset.ods",
   "file_size_bytes": 45066461,
@@ -30,7 +31,6 @@
     245207,
     40
   ],
-  "python": "3.12.13",
   "import_artifact_resolution": {
     "ods_import_shape": [
       490412,
@@ -47,5 +47,5 @@
     ],
     "rule": "Retain rows with FINANCIAL_YEAR and drop unnamed trailing columns."
   },
-  "download_timestamp_utc": "2026-07-30T19:13:49.508579+00:00"
+  "python": "3.12.14"
 }

@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "status": "post-review exploratory diagnostics; the study holdout periods have already been inspected",
+  "output_dir": "outputs/diagnostics",
+  "source_snapshot_policy": "match current core archive manifest and source metadata",
+  "xgboost_device": "cuda",
+  "baseline_logistic_c": 1.0,
+  "bootstrap_repeats": 10000,
+  "bootstrap_seed": 20260921
+}

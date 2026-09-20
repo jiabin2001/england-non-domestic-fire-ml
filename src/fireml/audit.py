@@ -203,7 +203,7 @@ For 2024/25, the main study estimand (excluding roofs) gives {row_2024['larger_p
 - Target categories reliably mappable: yes, with roofs explicitly excluded in the main definition.
 - Financial-year design usable: yes.
 - Key Block A/B/C fields usable in {main_year_span}: {'yes' if key_missing_max < 0.95 else 'no'}; maximum field missingness is {key_missing_max:.1%}.
-- Information timing: Block C inherits retrospective investigation fields. `OCCUPIED_TIME` can include occupants in buildings reached by spread and is a potential outcome proxy. Field availability and missingness do not establish availability at prediction time; no removal sensitivity analysis is included in this audit.
+- Information timing: Block C inherits retrospective investigation fields. `OCCUPIED_TIME` can include occupants in buildings reached by spread and is a potential outcome proxy. Field availability and missingness do not establish availability at prediction time. The final analysis separately reports an occupancy-removal sensitivity and simple single-field baselines.
 
 ## Main analysis window
 

@@ -83,7 +83,7 @@ def test_mismatched_selected_families_fail_preflight(
         reporting._validate_report_selection()
 
 
-def test_render_keeps_historical_receipts_and_records_current_environment(tmp_path, monkeypatch):
+def test_render_keeps_training_receipts_and_records_render_environment(tmp_path, monkeypatch):
     monkeypatch.setattr(reporting, "ROOT", tmp_path)
     for relative in reporting.REPORT_INPUTS:
         path = tmp_path / relative
@@ -121,7 +121,7 @@ def test_render_keeps_historical_receipts_and_records_current_environment(tmp_pa
     for name, content in historical.items():
         relative = f"outputs/metrics/{name}.json"
         assert (tmp_path / relative).read_bytes() == content
-        assert context["historical_receipts"][relative]["sha256"] == hashlib.sha256(content).hexdigest()
+        assert context["input_receipts"][relative]["sha256"] == hashlib.sha256(content).hexdigest()
 
 
 def test_report_only_entrypoint_calls_renderer(monkeypatch):
@@ -250,3 +250,101 @@ def test_final_report_renders_changed_outcomes_from_synthetic_artifacts(tmp_path
     assert "2022/23–2023/24 folds occur after that selection window" in report
     assert "`OCCUPIED_TIME`" in report
     assert "XGBoost had the highest" not in report
+    assert "no_rerun_revision" not in report
+    assert "historical" not in report
+
+
+@pytest.fixture
+def diagnostic_results():
+    performance, uncertainty, plan = [], [], []
+    for experiment_id, design, family, block, point, reference in (
+        ("b_minus_occupied_random", "random", "xgboost", "B", 0.62, 0.60),
+        ("b_minus_occupied_temporal", "temporal", "xgboost", "B", 0.57, 0.61),
+        ("building_type_temporal", "temporal", "logistic_regression", "B", 0.51, 0.61),
+        ("arrival_size_temporal", "temporal", "logistic_regression", "C", 0.93, 0.94),
+    ):
+        performance.append({
+            "experiment_id": experiment_id, "split_role": "test", "design": design,
+            "model": family, "reference_block": block, "pr_auc": point,
+        })
+        plan.append({"experiment_id": experiment_id, "columns": ["synthetic"]})
+        for model, estimand, value in (
+            (experiment_id, "average precision", point),
+            (f"core_{design}_{block}", "average precision", reference),
+            (experiment_id, "paired new-minus-reference average-precision difference", point - reference),
+        ):
+            uncertainty.append({
+                "experiment_id": experiment_id, "design": design, "model": model,
+                "estimand": estimand, "point_estimate": value,
+                "ci_lower_95": value - 0.005, "ci_upper_95": value + 0.005,
+            })
+    uncertainty.append({
+        "experiment_id": "b_minus_occupied_random_minus_temporal", "design": "random-minus-temporal",
+        "model": "b_minus_occupied", "estimand": "random-minus-temporal average-precision difference",
+        "point_estimate": 0.05, "ci_lower_95": 0.03, "ci_upper_95": 0.07,
+    })
+    return {
+        "performance": pd.DataFrame(performance), "uncertainty": pd.DataFrame(uncertainty),
+        "receipt": {"status": "fits_completed", "identity": {"input_sha256": {}, "experiment_plan": plan}},
+        "uncertainty_receipt": {"bootstrap_repeats": 1000, "bootstrap_seed": 4, "method_notes": "Synthetic method note."},
+    }
+
+
+def test_diagnostics_report_uses_actual_signed_results_and_interpretation(diagnostic_results):
+    report = reporting._diagnostics_report_section(diagnostic_results)
+    methods = reporting._diagnostics_methods_section(diagnostic_results)
+    assert "+0.0200 [+0.0150, +0.0250]" in report
+    assert "-0.0400 [-0.0450, -0.0350]" in report
+    assert "+0.0500 [+0.0300, +0.0700]" in report
+    assert "1,000 bootstrap repeats" in report
+    assert "change both information and model family" in report
+    assert "no joint difference-of-differences interval" in report
+    assert "not the presence or amount of leakage" in report
+    assert "seed: 4" in methods
+    assert "no_rerun_revision" not in report + methods
+
+
+def test_diagnostic_figures_plot_the_supplied_intervals(diagnostic_results, monkeypatch):
+    figures = {}
+    monkeypatch.setattr(reporting, "_save", lambda figure, stem: figures.update({stem: figure}))
+    reporting._diagnostic_figures(diagnostic_results)
+    assert set(figures) == {"11_occupancy_ablation", "12_simple_baselines"}
+    occupancy = figures["11_occupancy_ablation"]
+    # Four actual AP points and both signed paired differences are plotted, not placeholders.
+    assert [float(line.get_xdata()[0]) for line in occupancy.axes[0].lines] == [0.60, 0.62, 0.61, 0.57]
+    assert [float(line.get_xdata()[0]) for line in occupancy.axes[1].lines[:2]] == pytest.approx([0.02, -0.04])
+    baseline = figures["12_simple_baselines"]
+    assert [float(line.get_xdata()[0]) for line in baseline.axes[0].lines] == [0.61, 0.51, 0.94, 0.93]
+    for figure in figures.values():
+        reporting.plt.close(figure)
+
+
+def test_incomplete_diagnostic_directory_fails_before_render(tmp_path, monkeypatch):
+    monkeypatch.setattr(reporting, "ROOT", tmp_path)
+    (tmp_path / "outputs/diagnostics").mkdir(parents=True)
+    with pytest.raises(FileNotFoundError, match="Incomplete diagnostics"):
+        reporting._load_diagnostics()
+
+
+def test_diagnostics_loader_rejects_changed_core_reference(tmp_path, monkeypatch, diagnostic_results):
+    monkeypatch.setattr(reporting, "ROOT", tmp_path)
+    directory = tmp_path / "outputs/diagnostics"
+    directory.mkdir(parents=True)
+    for name in ("performance", "uncertainty"):
+        diagnostic_results[name].to_csv(directory / f"{name}.csv", index=False)
+    receipt = diagnostic_results["receipt"]
+    receipt["performance_sha256"] = hashlib.sha256((directory / "performance.csv").read_bytes()).hexdigest()
+    reference = tmp_path / "outputs/metrics/model_selection.json"
+    reference.parent.mkdir(parents=True)
+    reference.write_bytes(b"matching reference")
+    receipt["identity"]["input_sha256"] = {
+        "outputs/metrics/model_selection.json": hashlib.sha256(reference.read_bytes()).hexdigest(),
+    }
+    uncertainty_receipt = diagnostic_results["uncertainty_receipt"]
+    uncertainty_receipt["output_sha256"] = hashlib.sha256((directory / "uncertainty.csv").read_bytes()).hexdigest()
+    (directory / "experiment_receipt.json").write_text(json.dumps(receipt))
+    (directory / "uncertainty_receipt.json").write_text(json.dumps(uncertainty_receipt))
+    assert reporting._load_diagnostics() is not None
+    reference.write_bytes(b"new core run")
+    with pytest.raises(ValueError, match="Diagnostics reference input changed"):
+        reporting._load_diagnostics()

@@ -1,5 +1,6 @@
 {
-  "python": "3.12.13",
+  "record_type": "model_training_environment",
+  "python": "3.12.14",
   "platform": "Windows-11-10.0.26200-SP0",
   "pandas": "3.0.5",
   "numpy": "2.5.1",

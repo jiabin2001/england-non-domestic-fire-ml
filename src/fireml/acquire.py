@@ -71,6 +71,10 @@ def acquire_and_cache(force: bool = False) -> tuple[pd.DataFrame, dict]:
             metadata["import_artifact_resolution"] = artifact
             metadata["data_shape"] = [int(frame.shape[0]), int(frame.shape[1])]
         metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+        if "all_sheets" in metadata:
+            pd.DataFrame(metadata["all_sheets"]).to_csv(
+                ROOT / "outputs/tables/ods_sheet_inventory.csv", index=False
+            )
         return frame, metadata
     if not raw_path.exists():
         raise FileNotFoundError(

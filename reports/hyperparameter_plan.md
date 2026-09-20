@@ -1,7 +1,5 @@
 # Hyperparameter plan
 
-> This file describes the saved study configuration. Its numerical results and candidate settings are unchanged; no selection or training was repeated for the current correction. See [no-rerun revision note](no_rerun_revision.md).
-
 ## Status and selection boundary
 
 Candidate configurations are deliberately compact and are selected only by validation-set average precision, calculated with scikit-learn's `average_precision_score`. Holdout performance does not alter the candidate set. The selected configuration is a practical comparison setting, not a claim of theoretical optimality.
@@ -13,13 +11,13 @@ XGBoost runtime device: `cuda` (`hist` tree method). An explicit `cuda` configur
 | design | model | validation average precision | fit seconds |
 |---|---|---:|---:|
 | temporal | dummy | 0.2974 | 0.96 |
-| temporal | logistic_regression | 0.6467 | 1.38 |
-| temporal | random_forest | 0.6267 | 70.70 |
-| temporal | xgboost | 0.6637 | 1.27 |
-| random | dummy | 0.2572 | 0.91 |
-| random | logistic_regression | 0.6312 | 1.25 |
-| random | random_forest | 0.6117 | 73.73 |
-| random | xgboost | 0.6473 | 1.22 |
+| temporal | logistic_regression | 0.6467 | 1.44 |
+| temporal | random_forest | 0.6267 | 77.87 |
+| temporal | xgboost | 0.6637 | 1.42 |
+| random | dummy | 0.2572 | 0.93 |
+| random | logistic_regression | 0.6312 | 1.28 |
+| random | random_forest | 0.6117 | 82.85 |
+| random | xgboost | 0.6473 | 1.20 |
 
 ## Logistic Regression
 
@@ -125,8 +123,4 @@ XGBoost runtime device: `cuda` (`hist` tree method). An explicit `cuda` configur
 
 ## Stability rule
 
-All candidate validation AP values are retained. The selected configuration's margin over adjacent candidates is reported in `hyperparameter_stability_summary.csv`. Expanding-window and sensitivity analyses reuse the selected configuration.
-
-For the temporal design, model selection used 2020/21–2021/22 labels. Reusing that family and configuration to evaluate annual models in those same years does not create independent test results: those two rows are descriptive development-period analyses. The 2022/23–2023/24 annual rows follow the selection period. Restoring four independent rolling evaluations would require selection using only data available before each evaluation year; that experiment has not been run.
-
-New feature ablations or model choices prompted by the review, if assessed on the already-inspected holdouts, must be labelled post-review exploratory analyses. Retaining the original settings for a field-removal experiment would test sensitivity at those fixed settings, not the fully retuned optimum for the revised feature set.
+All candidate validation AP values are retained. The selected configuration's margin over adjacent candidates is reported in `hyperparameter_stability_summary.csv`. Expanding-window and sensitivity analyses reuse the selected configuration. Annual evaluations within the selection period are descriptive development-period results: their labels contributed to family and parameter selection even when each annual fit uses only earlier records. They are not independent temporal tests or a nested annual selection procedure.

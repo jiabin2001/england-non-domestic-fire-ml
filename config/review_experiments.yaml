@@ -1,0 +1,12 @@
+version: 1
+status: "post-review exploratory diagnostics; the study holdout periods have already been inspected"
+output_dir: "outputs/diagnostics"
+source_snapshot_policy: "match current core archive manifest and source metadata"
+xgboost_device: "cuda"
+baseline_logistic_c: 1.0
+bootstrap_repeats: 10000
+bootstrap_seed: 20260921
+# Exactly four fits; no search, new split assignment or strict arrival-time model.
+# B-minus-occupancy uses each design's core XGBoost settings and seed.
+# Single-field baselines use temporal data and fixed C=1.0, decided before fitting.
+# All pipelines fit training only; F1 thresholds are chosen on validation only.

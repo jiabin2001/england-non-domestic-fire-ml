@@ -1,129 +1,115 @@
-# England Other Building Fire Spread ML
+# England Non-Domestic Fire Spread ML
 
-Research code and saved outputs for the dissertation study:
+**How much does a random train–test split change estimated fire-spread prediction performance?** This study compares random and temporal evaluation on completed England Fire and Rescue Service incident records, with explicit checks of feature timing, outcome-proxy sensitivity and simple baselines.
 
-> **Do random train–test splits overestimate fire-spread prediction? A temporally validated machine-learning study of non-domestic building fires in England**
+The repository contains reproducible Python code, fitted models, per-record test predictions, uncertainty estimates and a generated [analysis report](reports/final_analysis_report.md). All published results were rebuilt in the current run; the [execution record](outputs/metrics/execution.json) documents its stages and code/configuration hashes.
 
-**Revision status:** the current code and documentation corrections do not rerun the study. Numerical tables, fitted models, predictions and historical figures remain unchanged. The reviewed snapshot [`c67f6fc`](https://github.com/jiabin2001/england-non-domestic-fire-ml/tree/c67f6fcb52834abe2695bfc05ba5bcf6a9e40498) contains those artifacts; it is not established as their training commit. Read the [no-rerun revision note](reports/no_rerun_revision.md) for the corrected interpretation, artifact boundary and remaining experiments.
+This is a retrospective prediction study. Its results do not establish real-time deployment readiness, causal effects or a building's annual ignition risk. The official **Other Building Fires** category includes commercial, industrial, public and institutional premises, and some accommodation such as hotels and care homes.
 
-## Scope and interpretation
+## Results at a glance
 
-The official data source is the **Other Building Fires Dataset** published by the UK government for England. “Non-domestic building fires” is used here as an analytical term for the official *other building fires* category. The category includes commercial, industrial, public and institutional buildings. It can also include hotels, hostels, care homes and student halls that are not ordinary private dwellings; it must not be described as containing only buildings with no accommodation function.
+The main cohort contains **209,171 incidents** from **2010/11–2023/24**, with **53,804 larger fires (25.7%)**. Average precision (AP) is the primary metric; higher is better, and the no-information baseline is the positive prevalence.
 
-This is a retrospective incident-level prediction study using completed Fire and Rescue Service records. It is not a real-time deployment tool, causal-inference study, annual building ignition-risk model or fire-physics simulation.
+| Experiment | Random test AP | Temporal test AP |
+|---|---:|---:|
+| Full Block B, validation-selected XGBoost | 0.6566 | 0.6402 |
+| Block B without `OCCUPIED_TIME`, same XGBoost settings | 0.6523 | 0.6387 |
+| `BUILDING_TYPE` only, logistic regression | — | 0.5173 |
+| `FIRE_SIZE_ON_ARRIVAL` only, logistic regression | — | 0.9627 |
+| Full Block C, validation-selected XGBoost | 0.9739 | 0.9821 |
 
-- Official entry page: [Fire statistics incident level datasets](https://www.gov.uk/government/statistics/fire-statistics-incident-level-datasets)
-- Official field and quality guidance: [Other building fires dataset guidance](https://www.gov.uk/government/statistics/fire-statistics-incident-level-datasets/other-building-fires-dataset-guidance)
-- Current ODS used: [Other Building Fires Dataset](https://assets.publishing.service.gov.uk/media/6a5e7a52c7c34404041b4663/Other_building_fires_dataset.ods)
+The full-Block-B random-minus-temporal AP difference is **+0.0164**, with a 95% fixed-model bootstrap interval of **[+0.0013, +0.0316]**. This quantifies the selected models on these splits; it is not a universal estimate of optimism from random splitting. AP comparisons also depend on prevalence. ROC-AUC, Brier score, prevalence context and 20 random split assignments are reported separately.
 
-The study treats the retained raw ODS as immutable. Its recorded file size, download timestamp, SHA-256, page-update date, sheet inventory and data-sheet choice are in `data/raw/source_metadata.json` and `reports/methods_receipt.md`. The source metadata is committed; the ODS and the raw/cohort Parquet files are excluded from Git and absent from a clean checkout.
+Without `OCCUPIED_TIME`, the split difference is **+0.0136 [-0.0017, +0.0285]**. Its point estimate remains positive, but the interval includes zero: evidence for a positive gap is less conclusive under this reduced-feature specification. This is not evidence that the two gaps differ significantly; no joint difference-of-differences interval was estimated.
 
-The publisher URL is mutable: a checksum can verify a retained file but cannot recover it after replacement. A separately downloadable archive of the exact historical data is not supplied by this repository. Before dissertation deposit, archive the exact ODS, its `source_metadata.json`, `data/interim/other_building_fires_raw.parquet` and `data/processed/analysis_cohort.parquet` in durable institution-controlled storage. `outputs/metrics/data_archive_manifest.json` records historical data-file sizes and SHA-256 values; its `exists` fields describe the original recording environment, not availability in a fresh checkout.
+[![Block B model comparison under random and temporal evaluation](outputs/figures/03_random_vs_temporal_pr_auc.png)](outputs/figures/03_random_vs_temporal_pr_auc.png)
 
-## Main design
+*Figure 1. The same modelling families are evaluated under both designs. Hyperparameters and analytical F1 thresholds are selected using validation data; test scores do not choose the winner. Click any figure to view full size.*
 
-- Main cohort: primary other-building fires, 2010/11–2023/24, exact duplicates removed, late calls excluded, and only unambiguously mapped target categories retained.
-- Binary target: `LARGER_FIRE`, derived strictly from observed `SPREAD_OF_FIRE` strings. The main estimand uses the unambiguous room→floor→whole-building ordering and excludes `Roofs/ Roof spaces`. Official sources differ on whether roofs belong in the larger-fire grouping, so a roof-positive sensitivity tests the alternative published convention.
-- Models: prior Dummy baseline, Logistic Regression, Random Forest and XGBoost. The latter three are the only main machine-learning models.
-- Block A: structural and context information.
-- Block B: retrospective incident information. Investigation and estimated-delay limitations mean this is not strictly a dispatch-time model.
-- Block C: retrospective incident information plus arrival-state information. It inherits Block B's investigation fields, which need not be available when crews arrive; its high AP does not establish a deployable arrival-time predictor.
-- `OCCUPIED_TIME`, retained in B and C, can include occupancy of buildings to which the fire has spread. It is a potential outcome proxy rather than a reliably initial-state field. No field-removal ablation has been performed in this revision.
-- Validation: a temporally ordered primary design and a target-stratified random comparator with exactly matching train/validation/test sample sizes.
-- Annual analysis: 2020/21–2021/22 also supplied model-selection labels, so their expanding-window results are descriptive development-period results. The 2022/23–2023/24 annual results occur after that selection period. The four rows are not four independent test folds.
-- XGBoost execution device: explicitly fixed in `config/analysis.yaml`; `auto` remains available only as a visibly warned fallback because CPU/GPU training can produce different fitted artifacts.
-- Primary metric: average precision (AP), calculated with scikit-learn's non-interpolated `average_precision_score`. Legacy `pr_auc` column and file stems retain their existing names for compatibility but store this AP value, not trapezoidal area under an interpolated precision–recall curve. Because AP's no-information baseline is approximately the positive prevalence, random–temporal comparisons are reported with prevalence context, ROC-AUC, Brier score and fixed-model bootstrap intervals. The validation-F1 threshold is an analytical operating point, not a business-optimal FRS decision rule.
-- Interpretation: original-field grouped permutation importance is reported only for the validation-selected Temporal Block B XGBoost pipeline. It measures model dependence on the fixed temporal test set, not causal effects.
+[![Occupancy-field removal sensitivity](outputs/figures/11_occupancy_ablation.png)](outputs/figures/11_occupancy_ablation.png)
 
-## Environment
+*Figure 2. Removing `OCCUPIED_TIME` changes AP by -0.0044 on the random holdout and -0.0015 on the temporal holdout. The right panel shows paired differences on identical test records (without occupancy minus full B). The field may include occupants in buildings reached by spread, so this measures sensitivity to a potential outcome proxy; it neither proves nor rules out leakage. Other fields can carry related information.*
 
-The saved environment receipt records Python 3.12 and dependencies pinned in `pyproject.toml`. This revision preserves that receipt and does not independently establish the original training environment. On Windows PowerShell:
+[![Single-field temporal baselines compared with full models](outputs/figures/12_simple_baselines.png)](outputs/figures/12_simple_baselines.png)
+
+*Figure 3. Simple baselines make the information content of building type and arrival fire size visible. Differences are single-field baseline minus full reference. These comparisons change both information and model family, so they do not isolate effects of additional features. High arrival-state AP does not show that the full Block C information was available when crews arrived.*
+
+The four diagnostic fits were specified after reviewing the study and use previously examined test periods. Their 10,000-repeat intervals condition on fitted models and observed class counts, with paired resampling for same-test comparisons and partially paired resampling for overlapping random/temporal holdouts. They omit retraining and model-selection uncertainty and are exploratory, without multiplicity adjustment. The main Block B interval uses 100,000 repeats under the same fixed-model interpretation.
+
+## Study design
+
+[![Study workflow](outputs/figures/01_study_workflow.png)](outputs/figures/01_study_workflow.png)
+
+*Figure 4. Source import, cohort construction, validation-based model selection, holdout evaluation and sensitivity analysis. The temporal partition is shown below; the stratified random comparator uses exactly the same partition sizes.*
+
+| Temporal partition | Financial years | Incidents |
+|---|---|---:|
+| Training | 2010/11–2019/20 | 159,533 |
+| Validation | 2020/21–2021/22 | 23,824 |
+| Test | 2022/23–2023/24 | 25,814 |
+
+- **Outcome:** `LARGER_FIRE`, mapped explicitly from `SPREAD_OF_FIRE`. The main cohort removes exact duplicates and late calls, excludes roof/roof-space and predefined unknown/missing target categories, and retains the room→floor→whole-building ordering. Unrecognised labels fail validation. A roof-positive sensitivity tests the alternative published convention.
+- **Models:** prior-probability Dummy, Logistic Regression, Random Forest and XGBoost. Compact candidate grids are searched using Block B validation AP. Preprocessing fits training data only. Models remain train-fitted when their validation-F1 thresholds are applied to test data.
+- **Block A:** structural and context fields. **Block B:** retrospective incident fields, including investigation information and estimated delay. **Block C:** Block B plus arrival-state fields. B is not a strictly dispatch-time model, and C is not a verified arrival-time model.
+- **Diagnostics:** remove `OCCUPIED_TIME` from B under both designs with the selected XGBoost parameters fixed; fit two temporal single-field logistic baselines with fixed `C=1.0`.
+- **Robustness:** alternative outcome/cohort definitions, later-year evaluation, annual expanding windows and 20 random split assignments. Annual 2020/21–2021/22 results are descriptive because these years also inform model selection; they are not independent test folds.
+- **Interpretation:** grouped permutation importance measures dependence of the fitted temporal Block B model on original fields, not causal effects. AP is scikit-learn's non-interpolated `average_precision_score`; legacy `pr_auc` file/column names store this metric.
+
+No external GIS, weather, demographic or commercial-building data are used. Operational deployment would require verified feature availability, a defined decision and its costs, and prospective or independently held-out evaluation.
+
+## Reproduce the analysis
+
+Use **Python 3.12** and the dependencies pinned in [pyproject.toml](pyproject.toml). The recorded run uses an NVIDIA GPU and XGBoost `device=cuda`; actual fitted CUDA execution is checked. Logistic regression convergence warnings fail the run rather than silently accepting an unconverged model.
 
 ```powershell
 py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --upgrade pip setuptools wheel
-.\.venv\Scripts\python.exe -m pip install -e ".[test]"
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[test]"
 ```
 
-The acquisition script does not download data automatically. A full analysis requires either the retained raw Parquet with the committed `data/raw/source_metadata.json`, or the source ODS for a one-time import. If neither data file is available, obtain the ODS separately and place it at:
+Obtain the [official source ODS](https://assets.publishing.service.gov.uk/media/6a5e7a52c7c34404041b4663/Other_building_fires_dataset.ods) and place it at `data/raw/Other_building_fires_dataset.ods`. Acquisition does not download it automatically. The expected source SHA-256 is:
 
 ```text
-data/raw/Other_building_fires_dataset.ods
+560e5c1a18731cf8189b28471f6813675d6f95f447d680ec5603d9bb97718595
 ```
 
-Do not modify the source file. Compare it against the saved SHA-256 before calling a run a reproduction of the historical data. A newer file from the same URL constitutes a new data version. Once the raw Parquet and source metadata exist, the ordinary cached path does not re-import the ODS. The processed cohort alone is insufficient for the full audit and alternative-cohort analyses.
-
-The recorded XGBoost device is `cuda`. A run intended to reproduce those settings needs compatible NVIDIA hardware and the recorded dependencies; matching them does not guarantee bit-for-bit output equality. Setting `xgboost_device: cpu` is supported for a separately recorded CPU experiment, but it is not an exact rerun of the saved CUDA models. Synthetic unit tests and saved-artifact reporting do not require CUDA.
-
-## Full analysis or saved-artifact reporting
-
-The following command is a **full rerun**. It rebuilds the audit, cohort, models, predictions, bootstrap intervals, permutation analysis, robustness analyses and reports, and overwrites their existing paths. Use a separate checkout if retaining the saved experiment:
+The ODS and two derived Parquet data files are excluded from Git. First import can require substantial RAM because the ODS parser loads its worksheets in memory; later runs use the Parquet cache. This run's exact source and derived-file hashes are in the [data manifest](outputs/metrics/data_archive_manifest.json). The publisher URL can change: retain or archive the matching ODS and both Parquet files separately. A checksum verifies retained bytes but does not make the data downloadable from this repository.
 
 ```powershell
-python scripts/06_build_report.py
-```
+# Full rebuild: replaces outputs/ and regenerates all models, diagnostics and reports.
+python scripts/06_build_report.py --clean
 
-To render reports from existing saved outputs without acquiring data, fitting models, bootstrapping or running permutation analysis, use:
-
-```powershell
+# Render saved results only; no acquisition, fitting or bootstrap.
 python scripts/07_render_report.py
 ```
 
-The reporting command reads the committed source metadata, saved tables, receipts and per-record predictions; it does not require the external ODS or raw/cohort Parquet files. It recomputes report summaries, calibration/confusion tables and figures, so it is a reporting calculation rather than a zero-computation edit. It preserves `runtime_environment.json` and the historical data archive manifest, and records the current rendering environment separately in `report_environment.json`. Missing saved inputs must be restored; this command does not recreate them by training. It was not run for this documentation revision.
+The full run records stage completion, input code/config hashes and errors in `outputs/metrics/execution.json`. Source, training, diagnostic and rendering provenance are recorded separately. Rendering reads saved predictions and tables and regenerates summaries/figures; it does not overwrite training receipts. A clean checkout can render committed results without external data or CUDA.
 
-Scripts `01`–`05` expose individual acquisition, audit, cohort, model and robustness stages. They are not a complete replacement for `06`: the full orchestrator also runs uncertainty and permutation analyses. Running `06` after them repeats their work.
+For a partial workflow, scripts `01`–`05` expose acquisition, audit, cohort, model and robustness stages. `08_run_review_experiments.py` adds the four diagnostics to an already complete matching core analysis; `--fit-only`, `--uncertainty-only` and `--resume` separate verified fitting from interval calculation. Its completed fits are protected against accidental overwrite. The complete `06` command handles the correct order automatically.
 
-To extend only the configured random split-assignment sensitivity analysis, without rerunning core model selection or the fixed-model bootstrap, use:
+The complete diagnostic protocol requires CUDA and the source ODS for checksum verification. CPU experiments would require explicitly revising the protocol and recording a new run; matching software and hardware still does not promise bit-for-bit model reproduction.
 
-```powershell
-python scripts/05_run_random_split_stability.py
-python scripts/07_render_report.py
-```
-
-The targeted stability script recomputes all configured split seeds but skips the other robustness analyses, core model selection and fixed-model bootstrap.
-
-The targeted stability command fits models for the configured assignments and changes results; it is not part of a no-rerun update.
-
-## Tests
-
-After installing the test dependencies, the default suite uses synthetic data and temporary files. It does not need source data, saved models or CUDA:
+## Validation and outputs
 
 ```powershell
-python -m pytest -q
+python -m pytest -q                 # Synthetic unit tests; no research data or GPU
+python -m pytest -q -m artifact     # Consistency of committed results
+python -m pytest -q -m integration  # Exact local source and Parquet data required
 ```
 
-Check the committed study artifacts separately:
+CI runs the synthetic suite and checks that it does not modify research artifacts. Tests cover target mapping, feature exclusion, split integrity, prediction alignment, exact bootstrap calculations, training boundaries, rendering and clean-run failure handling.
 
-```powershell
-python -m pytest -q -m artifact
-```
+The published run passed **109 synthetic tests, 32 artifact checks and 2 real-data integration checks**.
 
-Real-data integration checks require the exact external ODS and both Parquet files at the paths above, alongside the committed source metadata. They are intentionally excluded from the default suite and CI:
+| Location | Contents |
+|---|---|
+| [Final analysis report](reports/final_analysis_report.md) | Findings, uncertainty, diagnostics and limitations |
+| [Methods receipt](reports/methods_receipt.md) | Source, cohort, features, settings, software and output manifest |
+| [Hyperparameter plan](reports/hyperparameter_plan.md) | Candidate configurations and validation performance |
+| [outputs/tables](outputs/tables) | Audit, split assignments, performance and robustness tables |
+| [outputs/figures](outputs/figures) | Twelve figures, each in PNG and PDF |
+| [outputs/diagnostics](outputs/diagnostics) | Four diagnostic models, validation/test predictions, intervals and receipts |
+| [outputs/metrics](outputs/metrics) | Main predictions, execution, model selection and environment records |
+| [outputs/models](outputs/models) | Validation-selected fitted pipelines |
 
-```powershell
-python -m pytest -q -m integration
-```
-
-Neither the unit suite nor saved-artifact consistency checks establish that corrected code reproduces historical model performance; that requires an explicit research rerun.
-
-## Key outputs
-
-- `reports/day1_feasibility.md`: feasibility checks and the defined main time window.
-- `reports/no_rerun_revision.md`: corrections, unchanged historical artifacts and experiments still needed.
-- `reports/hyperparameter_plan.md`: compact validation search plan.
-- `reports/final_analysis_report.md`: results organised around RQ1–RQ3.
-- `reports/methods_receipt.md`: exact source, cohort, target, features, split, parameters, thresholds, uncertainty/interpretability settings, seeds, software and manifest.
-- `outputs/tables/bootstrap_confidence_intervals.csv`: 100,000-repeat partially paired fixed-model AP intervals; shared holdout records are resampled jointly so the observed overlap covariance is represented.
-- `outputs/tables/grouped_permutation_importance.csv`: original-field Temporal Block B model-dependence estimates, summarised by mean AP decrease and permutation sample SD. Thirty repeats are not used to infer tail percentiles.
-- `outputs/tables/pr_auc_prevalence_context.csv`: AP baseline, absolute lift and auxiliary normalized AP alongside ROC-AUC and Brier score. The legacy filename is retained for compatibility.
-- `outputs/tables/random_seed_stability.csv`: seed-level results for 20 random split assignments with estimator seed and selected hyperparameters fixed.
-- `outputs/tables/random_seed_stability_summary.csv`: median, IQR, range and sign-count receipt for the split-assignment AP sensitivity analysis.
-- `outputs/tables/`: all requested audit, performance, stability, subgroup and sensitivity tables.
-- `outputs/figures/`: ten figures in both PNG and PDF.
-- `outputs/models/`: validation-selected fitted pipelines.
-- `outputs/metrics/model_selection.json`: validation-selected hyperparameters, model families and analytical thresholds required for reproducibility.
-- `outputs/metrics/data_archive_manifest.json`: checksums and sizes for the raw ODS and two reproducibility Parquet files that must be deposited separately.
-
-The unchanged historical PNG/PDF captions and `outputs/tables/feature_policy.csv` may retain earlier Block C and field-risk wording. The revision note and corrected Markdown interpretation take precedence; the preserved files are not evidence that the corrected code has been run.
-
-No external GIS, weather, demographic, socioeconomic or commercial-building data are used. No neural network, deep learning, SMOTE comparison, stacking, Bayesian optimisation or large-scale Optuna search is included.
+Source definitions and quality notes: [government dataset entry page](https://www.gov.uk/government/statistics/fire-statistics-incident-level-datasets) and [Other Building Fires guidance](https://www.gov.uk/government/statistics/fire-statistics-incident-level-datasets/other-building-fires-dataset-guidance).

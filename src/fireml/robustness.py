@@ -11,7 +11,7 @@ from .config import ROOT, load_yaml
 from .drift import build_drift_tables, subgroup_performance
 from .evaluation import choose_f1_threshold, classification_metrics
 from .features import resolve_blocks
-from .modelling import make_model_pipeline
+from .modelling import fit_pipeline_checked, make_model_pipeline
 from .splits import make_random_split_like, make_temporal_split
 from .uncertainty import add_pr_auc_prevalence_context
 
@@ -27,7 +27,10 @@ def _fit_validation_then_test(
     device: str,
 ) -> tuple[dict, float]:
     development_model = make_model_pipeline(columns, family, parameters, seed, n_jobs, device)
-    development_model.fit(frame.loc[split["train"], columns], frame.loc[split["train"], "LARGER_FIRE"])
+    fit_pipeline_checked(
+        development_model, frame.loc[split["train"], columns], frame.loc[split["train"], "LARGER_FIRE"],
+        family=family, device=device,
+    )
     validation_probability = development_model.predict_proba(frame.loc[split["validation"], columns])[:, 1]
     threshold = choose_f1_threshold(frame.loc[split["validation"], "LARGER_FIRE"].to_numpy(), validation_probability)
     probability = development_model.predict_proba(frame.loc[split["test"], columns])[:, 1]
@@ -117,7 +120,10 @@ def run_temporal_robustness() -> dict[str, pd.DataFrame]:
         train_idx = frame.index[frame["FINANCIAL_YEAR"].isin(earlier)].to_numpy()
         test_idx = frame.index[frame["FINANCIAL_YEAR"].eq(test_year)].to_numpy()
         model = make_model_pipeline(columns, family, parameters, seed, n_jobs, device)
-        model.fit(frame.loc[train_idx, columns], frame.loc[train_idx, "LARGER_FIRE"])
+        fit_pipeline_checked(
+            model, frame.loc[train_idx, columns], frame.loc[train_idx, "LARGER_FIRE"],
+            family=family, device=device,
+        )
         probability = model.predict_proba(frame.loc[test_idx, columns])[:, 1]
         metrics = classification_metrics(frame.loc[test_idx, "LARGER_FIRE"].to_numpy(), probability, 0.5)
         expanding_rows.append({
@@ -156,7 +162,10 @@ def run_temporal_robustness() -> dict[str, pd.DataFrame]:
     train_idx = extended.index[extended["FINANCIAL_YEAR"].isin(audit["main_years"])].to_numpy()
     test_idx = extended.index[extended["FINANCIAL_YEAR"].eq("2024/25")].to_numpy()
     model = make_model_pipeline(extended_columns, family, parameters, seed, n_jobs, device)
-    model.fit(extended.loc[train_idx, extended_columns], extended.loc[train_idx, "LARGER_FIRE"])
+    fit_pipeline_checked(
+        model, extended.loc[train_idx, extended_columns], extended.loc[train_idx, "LARGER_FIRE"],
+        family=family, device=device,
+    )
     probability = model.predict_proba(extended.loc[test_idx, extended_columns])[:, 1]
     metrics = classification_metrics(
         extended.loc[test_idx, "LARGER_FIRE"].to_numpy(), probability, primary_threshold
