@@ -10,6 +10,10 @@ This project predicts whether a recorded fire spread beyond the room where it st
 
 The study uses the UK government's **Other Building Fires Dataset** for England. “Non-domestic building fires” refers here to this official category: commercial, industrial, public and institutional premises, as well as some accommodation such as hotels, hostels and care homes.
 
+- Official dataset page: [Fire statistics incident level datasets](https://www.gov.uk/government/statistics/fire-statistics-incident-level-datasets)
+- Field definitions and data quality: [Other building fires dataset guidance](https://www.gov.uk/government/statistics/fire-statistics-incident-level-datasets/other-building-fires-dataset-guidance)
+- Source file used in this study: [Other Building Fires Dataset (ODS)](https://assets.publishing.service.gov.uk/media/6a5e7a52c7c34404041b4663/Other_building_fires_dataset.ods)
+
 The binary outcome, `LARGER_FIRE`, distinguishes fires confined to the room of origin or less from fires spreading farther. Roof and roof-space records are excluded from the main definition and examined separately in a sensitivity analysis.
 
 Logistic Regression, Random Forest and XGBoost are compared with a prior-probability baseline. The primary temporal evaluation trains on earlier years and tests on **2022/23–2023/24**; the random comparator uses exactly the same training, validation and test sample sizes. Feature-block comparisons, an occupancy-field removal experiment and single-field baselines examine how performance depends on the information supplied to the models.
@@ -123,8 +127,6 @@ The published run passed **109 synthetic tests, 32 artifact checks and 2 real-da
 | [outputs/diagnostics](outputs/diagnostics) | Four diagnostic models, validation/test predictions, intervals and receipts |
 | [outputs/metrics](outputs/metrics) | Main predictions, execution, model selection and environment records |
 | [outputs/models](outputs/models) | Validation-selected fitted pipelines |
-
-Source definitions and quality notes: [government dataset entry page](https://www.gov.uk/government/statistics/fire-statistics-incident-level-datasets) and [Other Building Fires guidance](https://www.gov.uk/government/statistics/fire-statistics-incident-level-datasets/other-building-fires-dataset-guidance).
 
 ## License
 
