@@ -23,12 +23,16 @@ blocks:
       - FIRE_START_LOCATION
       - ITEM_IGNITED
   C:
-    name: "first-arrival prognostic model"
+    name: "retrospective incident plus arrival-state model"
     extends: B
     candidates:
       - FIRE_SIZE_ON_ARRIVAL
       - OTHER_PROPERTY_AFFECTED_ON_ARRIVAL
       - RESPONSE_TIME
+# Interpretation changes only: retain the historical feature sets and results.
+interpretation_notes:
+  C: "Inherits investigative and retrospectively recorded fields from Block B; not restricted to information available at first arrival."
+  OCCUPIED_TIME: "Official guidance includes people in buildings to which the fire spread. Retained in Blocks B/C for historical comparability, but may encode realised spread; its effect has not been quantified by a removal sensitivity analysis."
 leakage_blacklist:
   - SPREAD_OF_FIRE
   - ITEM_CAUSING_SPREAD

@@ -22,13 +22,43 @@ def financial_year_key(value: str) -> int:
     return int(str(value).split("/")[0])
 
 
+def temporal_year_partitions(cfg: dict) -> dict[str, list[str]]:
+    """Allocate configured main years without silently ignoring window lengths."""
+    years = cfg["preferred_main_years"]
+    if not isinstance(years, list) or not years or not all(isinstance(year, str) for year in years):
+        raise ValueError("preferred_main_years must be a nonempty list of financial-year strings.")
+    try:
+        keys = [financial_year_key(year) for year in years]
+    except ValueError as exc:
+        raise ValueError("preferred_main_years contains an invalid financial year.") from exc
+    if keys != sorted(set(keys)):
+        raise ValueError("preferred_main_years must contain unique years in chronological order.")
+    for setting in ("temporal_validation_years", "temporal_test_years"):
+        value = cfg[setting]
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise ValueError(f"{setting} must be a positive integer.")
+    validation_count = cfg["temporal_validation_years"]
+    test_count = cfg["temporal_test_years"]
+    if validation_count + test_count >= len(years):
+        raise ValueError("Temporal validation and test windows must leave at least one training year.")
+    return {
+        "temporal_train_years": years[:-(validation_count + test_count)],
+        "temporal_validation_years": years[-(validation_count + test_count):-test_count],
+        "temporal_test_years": years[-test_count:],
+    }
+
+
 def run_audit() -> dict:
     ensure_output_dirs()
     cfg = load_yaml("config/analysis.yaml")
+    partitions = temporal_year_partitions(cfg)
+    preferred = cfg["preferred_main_years"]
+    main_year_span = f"{preferred[0]}–{preferred[-1]}"
     parquet = ROOT / cfg["parquet_path"]
     frame = pd.read_parquet(parquet)
     if not {"FINANCIAL_YEAR", "SPREAD_OF_FIRE", "LATE_CALL"}.issubset(frame.columns):
         raise RuntimeError("Blocking feasibility failure: required fields are absent.")
+    blocks = resolve_blocks(frame.columns)
     frame = frame.sort_values("FINANCIAL_YEAR", key=lambda s: s.map(financial_year_key)).reset_index(drop=True)
     target, mapping = map_target(frame["SPREAD_OF_FIRE"])
 
@@ -116,9 +146,7 @@ def run_audit() -> dict:
 
     feature_policy = build_feature_policy(frame)
     feature_policy.to_csv(ROOT / "outputs/tables/feature_policy.csv", index=False)
-    blocks = resolve_blocks(frame.columns)
 
-    preferred = cfg["preferred_main_years"]
     usable = set(year_coverage["financial_year"])
     years_present = all(year in usable for year in preferred)
     key_fields = sorted(set(blocks["C"]))
@@ -161,8 +189,8 @@ For 2024/25, the main study estimand (excluding roofs) gives {row_2024['larger_p
 ## Time and data quality
 
 - Available years: {', '.join(year_coverage['financial_year'])}.
-- All prespecified main years 2010/11–2023/24 are present.
-- The two latest complete main-window years become temporal test (2022/23–2023/24); the preceding two become validation (2020/21–2021/22); earlier years form training.
+- All configured main years {main_year_span} present: {'yes' if years_present else 'no'}.
+- Temporal test uses the latest {cfg['temporal_test_years']} main-window years ({', '.join(partitions['temporal_test_years'])}); validation uses the preceding {cfg['temporal_validation_years']} ({', '.join(partitions['temporal_validation_years'])}); earlier years form training.
 - The dataset has no incident date or month. Calendar timing is limited to financial year, day of week and four day-part bands. It also contains banded process durations (`IGNITION_TO_DISCOVERY`, `DISCOVERY_TO_CALL`, `RESPONSE_TIME`, `TIME_AT_SCENE`); the latter are not calendar timestamps.
 - Suffolk FRS is incomplete from September 2024 to March 2025 according to current official guidance, so 2024/25 is excluded from the main analysis.
 - 2025/26 spans the IRS-to-FaRDaP collection transition beginning November 2025 and is excluded from the main analysis.
@@ -174,20 +202,18 @@ For 2024/25, the main study estimand (excluding roofs) gives {row_2024['larger_p
 - Incident-level structure supported: yes (one row per disclosed incident record; no public incident ID).
 - Target categories reliably mappable: yes, with roofs explicitly excluded in the main definition.
 - Financial-year design usable: yes.
-- Key Block A/B/C fields usable in 2010/11–2023/24: yes; maximum field missingness is {key_missing_max:.1%}.
-- Guidance consistency: no blocking inconsistency found.
+- Key Block A/B/C fields usable in {main_year_span}: {'yes' if key_missing_max < 0.95 else 'no'}; maximum field missingness is {key_missing_max:.1%}.
+- Information timing: Block C inherits retrospective investigation fields. `OCCUPIED_TIME` can include occupants in buildings reached by spread and is a potential outcome proxy. Field availability and missingness do not establish availability at prediction time; no removal sensitivity analysis is included in this audit.
 
 ## Main analysis window
 
-Use 2010/11–2023/24. Exclude exact duplicate rows, late calls and target-excluded rows. Do not use `FINANCIAL_YEAR` or FRS territory as predictors. Use validation data for compact model selection and evaluate the resulting train-fitted model on the temporal test.
+Use {main_year_span}. Exclude exact duplicate rows, late calls and target-excluded rows. Do not use `FINANCIAL_YEAR` or FRS territory as predictors. Use validation data for compact model selection and evaluate the resulting train-fitted model on the temporal test.
 """
     (ROOT / "reports/day1_feasibility.md").write_text(report, encoding="utf-8")
     receipt = {
         "feasible": feasible,
         "main_years": preferred,
-        "temporal_train_years": preferred[:-4],
-        "temporal_validation_years": preferred[-4:-2],
-        "temporal_test_years": preferred[-2:],
+        **partitions,
         "logical_rows": len(frame),
         "duplicate_rows": duplicate_rows,
         "feature_blocks": blocks,

@@ -32,4 +32,9 @@ where = ["src"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
+addopts = "--strict-markers -m 'not artifact and not integration'"
+markers = [
+  "artifact: read-only checks of the committed research outputs (opt in with -m artifact)",
+  "integration: checks requiring the separately archived source and cohort data (opt in with -m integration)",
+]
 

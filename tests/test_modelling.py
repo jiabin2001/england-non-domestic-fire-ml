@@ -26,3 +26,19 @@ def test_auto_xgboost_device_is_visible(monkeypatch):
 def test_invalid_xgboost_device_is_rejected():
     with pytest.raises(ValueError, match="cpu, cuda, auto"):
         modelling.resolve_xgb_device("gpu-maybe")
+
+
+def test_training_environment_records_versions_without_requiring_test_extra(monkeypatch):
+    def version(package):
+        if package == "pytest":
+            raise modelling.importlib.metadata.PackageNotFoundError(package)
+        return "training-version"
+
+    monkeypatch.setattr(modelling.importlib.metadata, "version", version)
+    receipt = modelling.training_environment("cpu", 2)
+    assert receipt["record_type"] == "model_training_environment"
+    assert receipt["xgboost_device"] == "cpu"
+    assert receipt["n_jobs"] == 2
+    assert receipt["packages"]["scikit-learn"] == "training-version"
+    assert receipt["packages"]["pyarrow"] == "training-version"
+    assert receipt["packages"]["pytest"] is None

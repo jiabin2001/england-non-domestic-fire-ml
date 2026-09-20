@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import importlib.metadata
 import platform
 import subprocess
 import time
@@ -26,6 +27,32 @@ from .splits import assignment_frame, make_random_split_like, make_temporal_spli
 
 
 FAMILIES = ("logistic_regression", "random_forest", "xgboost")
+
+
+def training_environment(device: str, n_jobs: int) -> dict[str, Any]:
+    """Capture versions during training, never by overwriting them during rendering."""
+    packages = {}
+    for package in (
+        "numpy", "pandas", "pyarrow", "odfpy", "scikit-learn", "xgboost",
+        "scipy", "matplotlib", "joblib", "PyYAML", "pytest",
+    ):
+        try:
+            packages[package] = importlib.metadata.version(package)
+        except importlib.metadata.PackageNotFoundError:
+            # pytest is optional for an analysis installation.
+            packages[package] = None
+    return {
+        "record_type": "model_training_environment",
+        "python": platform.python_version(),
+        "platform": platform.platform(),
+        "pandas": pd.__version__,
+        "numpy": np.__version__,
+        "scikit_learn": sklearn.__version__,
+        "xgboost": xgboost.__version__,
+        "xgboost_device": device,
+        "n_jobs": n_jobs,
+        "packages": packages,
+    }
 
 
 def detect_xgb_device() -> str:
@@ -202,7 +229,7 @@ XGBoost runtime device: `{device}` (`hist` tree method). An explicit `cuda` conf
 
 ## Stability rule
 
-All candidate validation AP values are retained. The selected configuration's margin over adjacent candidates is reported in `hyperparameter_stability_summary.csv`. Expanding-window and sensitivity analyses reuse the selected configuration.
+All candidate validation AP values are retained. The selected configuration's margin over adjacent candidates is reported in `hyperparameter_stability_summary.csv`. Expanding-window and sensitivity analyses reuse the selected configuration. Annual evaluations within the selection period are descriptive development-period results: their labels contributed to family and parameter selection even when each annual fit uses only earlier records. They are not independent temporal tests or a nested annual selection procedure.
 """
     (ROOT / "reports/hyperparameter_plan.md").write_text(report, encoding="utf-8")
 
@@ -366,16 +393,7 @@ def run_core_models() -> dict[str, Any]:
     stability["selected"] = np.isclose(stability["pr_auc"], stability["best_pr_auc"])
     stability.to_csv(ROOT / "outputs/tables/hyperparameter_stability_summary.csv", index=False)
 
-    runtime = {
-        "python": platform.python_version(),
-        "platform": platform.platform(),
-        "pandas": pd.__version__,
-        "numpy": np.__version__,
-        "scikit_learn": sklearn.__version__,
-        "xgboost": xgboost.__version__,
-        "xgboost_device": device,
-        "n_jobs": n_jobs,
-    }
+    runtime = training_environment(device, n_jobs)
     (ROOT / "outputs/metrics/runtime_environment.json").write_text(json.dumps(runtime, indent=2), encoding="utf-8")
     return {
         "selection": selection,

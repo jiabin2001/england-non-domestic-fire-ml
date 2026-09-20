@@ -1,5 +1,7 @@
 # Methods receipt
 
+> Historical receipt with documentation corrections only. All source hashes, sample counts, settings, thresholds and software values below are retained from reviewed snapshot `c67f6fcb52834abe2695bfc05ba5bcf6a9e40498`; the study was not rerun. That snapshot contains the saved artifacts but is not established as their training commit. The recorded archive availability and software environment have not been re-certified. See [no-rerun revision note](no_rerun_revision.md).
+
 ## Source
 
 - Official dataset: Other Building Fires Dataset
@@ -29,7 +31,9 @@
 
 - Block A — structural and context: `['DAY_OF_WEEK', 'DAY_NIGHT', 'BUILDING_TYPE', 'FSO_APPLY', 'OCCUPIED_NORMAL']`
 - Block B — retrospective incident information: `['DAY_OF_WEEK', 'DAY_NIGHT', 'BUILDING_TYPE', 'FSO_APPLY', 'OCCUPIED_NORMAL', 'OCCUPIED_TIME', 'ALARM_SYSTEM', 'SAFETY_SYSTEM', 'IGNITION_TO_DISCOVERY', 'DISCOVERY_TO_CALL', 'ACCIDENTAL_OR_DELIBERATE', 'CAUSE_OF_FIRE', 'IGNITION_POWER', 'SOURCE_OF_IGNITION', 'FIRE_START_LOCATION', 'ITEM_IGNITED']`
-- Block C — first-arrival prognostic: `['DAY_OF_WEEK', 'DAY_NIGHT', 'BUILDING_TYPE', 'FSO_APPLY', 'OCCUPIED_NORMAL', 'OCCUPIED_TIME', 'ALARM_SYSTEM', 'SAFETY_SYSTEM', 'IGNITION_TO_DISCOVERY', 'DISCOVERY_TO_CALL', 'ACCIDENTAL_OR_DELIBERATE', 'CAUSE_OF_FIRE', 'IGNITION_POWER', 'SOURCE_OF_IGNITION', 'FIRE_START_LOCATION', 'ITEM_IGNITED', 'FIRE_SIZE_ON_ARRIVAL', 'OTHER_PROPERTY_AFFECTED_ON_ARRIVAL', 'RESPONSE_TIME']`
+- Block C — retrospective incident information plus arrival-state information: `['DAY_OF_WEEK', 'DAY_NIGHT', 'BUILDING_TYPE', 'FSO_APPLY', 'OCCUPIED_NORMAL', 'OCCUPIED_TIME', 'ALARM_SYSTEM', 'SAFETY_SYSTEM', 'IGNITION_TO_DISCOVERY', 'DISCOVERY_TO_CALL', 'ACCIDENTAL_OR_DELIBERATE', 'CAUSE_OF_FIRE', 'IGNITION_POWER', 'SOURCE_OF_IGNITION', 'FIRE_START_LOCATION', 'ITEM_IGNITED', 'FIRE_SIZE_ON_ARRIVAL', 'OTHER_PROPERTY_AFFECTED_ON_ARRIVAL', 'RESPONSE_TIME']`
+- C inherits B's investigation fields, including cause and ignition information that can be revised after arrival. The saved C models have not been restricted to fields known at first arrival.
+- `OCCUPIED_TIME` can include occupancy of buildings to which the fire has spread, according to the [official field guidance](https://www.gov.uk/government/statistics/fire-statistics-incident-level-datasets/other-building-fires-dataset-guidance#variable-by-variable---situation). It is a potential outcome proxy in B and C; no removal ablation has been run and no performance correction is claimed.
 - All retained predictors are treated as categorical/banded fields. Missing/blank values become `Missing/Unknown`; one-hot encoding uses `handle_unknown='ignore'`. No rare-category merger was required because the largest field has 82 disclosed categories and sparse one-hot encoding remained tractable.
 - `RESPONSE_TIME` is used; its redundant code field is not used.
 - Leakage blacklist: `['SPREAD_OF_FIRE', 'ITEM_CAUSING_SPREAD', 'RAPID_FIRE_GROWTH', 'FIRE_DAMAGE_EXTENT', 'FIRE_DAMAGE_EXTENT_CODE', 'TOTAL_DAMAGE_EXTENT', 'TOTAL_DAMAGE_EXTENT_CODE', 'OTHER_PROPERTY_AFFECTED_CLOSE', 'TIME_AT_SCENE', 'TIME_AT_SCENE_CODE', 'TIME_AT_SCENE _CODE', 'VEHICLES', 'VEHICLES_CODE', 'PERSONNEL', 'PERSONNEL_CODE', 'FATALITY_CASUALTY', 'RESCUES', 'EVACUATIONS', 'EVACUATIONS_CODE']`
@@ -47,7 +51,8 @@
 - Legacy output columns and file stems named `pr_auc` store this non-interpolated AP value; no trapezoidal precision–recall curve area is calculated.
 - Threshold provenance: the selected train-fitted pipeline and its validation-derived threshold are evaluated on test without a train+validation refit or test-set retuning.
 - The validation years 2020/21–2021/22 overlap the COVID-disrupted period. The first expanding-window year has positive prevalence 0.325431; this design feature may affect selection and thresholds but does not identify a COVID effect.
-- Expanding-window thresholded metrics use fixed threshold 0.5 and are not directly comparable with main-table thresholded metrics. Annual AP, prevalence-relative summaries and ROC-AUC are the intended temporal-stability comparisons.
+- Expanding-window family and hyperparameters were selected using 2020/21–2021/22 labels before reuse in all four annual evaluations. The 2020/21–2021/22 rows are therefore descriptive development-period results even though their individual fits use earlier records. The 2022/23–2023/24 rows follow the selection period. The four rows are not four independent temporal test folds.
+- Expanding-window thresholded metrics use fixed threshold 0.5 and are not directly comparable with main-table thresholded metrics. Annual AP, prevalence-relative summaries and ROC-AUC are descriptive temporal comparisons subject to the selection-period restriction above.
 
 ## Hyperparameters and thresholds
 
@@ -85,6 +90,8 @@
 
 ## Software
 
+The following is the preserved historical receipt, not the environment of this documentation edit. Earlier reporting code could merge the rendering environment's package versions into this file; this revision does not establish whether that occurred for the saved receipt. Future reporting keeps its environment separate in `outputs/metrics/report_environment.json`. Missing original training provenance cannot be recovered by recording the current environment.
+
 ```json
 {
   "python": "3.12.13",
@@ -112,6 +119,8 @@
 ```
 
 ## Output manifest
+
+This is the historical output listing. The underlying saved tables, figures, models, predictions and JSON receipts have not been regenerated for the documentation correction. In particular, unchanged PNG/PDF captions and `outputs/tables/feature_policy.csv` may retain superseded Block C labels and field-risk wording. The corrected interpretation is recorded above and in [no-rerun revision note](no_rerun_revision.md).
 
 - `outputs/figures/01_study_workflow.pdf`
 - `outputs/figures/01_study_workflow.png`

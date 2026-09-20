@@ -16,7 +16,7 @@ OFFICIAL_MEANINGS = {
     "BUILDING_TYPE": "Type of building in which the fire occurred",
     "FSO_APPLY": "Whether the Regulatory Reform (Fire Safety) Order 2005 applies",
     "OCCUPIED_NORMAL": "Whether the building was normally occupied",
-    "OCCUPIED_TIME": "Whether the building was occupied at the time of the fire",
+    "OCCUPIED_TIME": "Whether the building was occupied at the time of the fire, including people in buildings to which the fire spread",
     "ALARM_SYSTEM": "Whether a smoke alarm was present and whether it operated/raised the alarm",
     "SAFETY_SYSTEM": "Whether a safety system was present and whether it operated",
     "IGNITION_TO_DISCOVERY": "Approximate time from ignition to discovery",
@@ -60,7 +60,7 @@ TIMING = {
     "BUILDING_TYPE": "incident context; retrospectively recorded",
     "FSO_APPLY": "incident context; retrospectively recorded",
     "OCCUPIED_NORMAL": "incident context; retrospectively recorded",
-    "OCCUPIED_TIME": "incident circumstances; retrospectively recorded",
+    "OCCUPIED_TIME": "retrospectively recorded; may reflect occupancy in buildings reached by fire spread",
     "ALARM_SYSTEM": "incident circumstances; retrospectively recorded",
     "SAFETY_SYSTEM": "incident circumstances; retrospectively recorded",
     "IGNITION_TO_DISCOVERY": "estimated incident history",
@@ -86,12 +86,20 @@ TIMING = {
 
 
 def resolve_blocks(columns: Iterable[str]) -> dict[str, list[str]]:
+    """Resolve the complete configured feature schema, failing on missing fields."""
     policy = load_yaml("config/feature_policy.yaml")
     available = set(columns)
     blocks: dict[str, list[str]] = {}
+    missing = {
+        name: sorted(set(policy["blocks"][name]["candidates"]) - available)
+        for name in ("A", "B", "C")
+    }
+    missing = {name: fields for name, fields in missing.items() if fields}
+    if missing:
+        raise ValueError(f"Required predictor columns are missing from the configured blocks: {missing}")
     for name in ("A", "B", "C"):
         inherited = list(blocks.get(policy["blocks"][name].get("extends", ""), []))
-        own = [c for c in policy["blocks"][name]["candidates"] if c in available]
+        own = list(policy["blocks"][name]["candidates"])
         blocks[name] = inherited + own
     assert_no_leakage(blocks, policy["leakage_blacklist"])
     return blocks
@@ -128,9 +136,20 @@ def build_feature_policy(frame: pd.DataFrame) -> pd.DataFrame:
         elif column == "LATE_CALL":
             risk = "cohort definition"
             reason = "Used only to define the main cohort."
+        elif column == "OCCUPIED_TIME":
+            risk = "potential outcome proxy (spread-dependent occupancy)"
+            reason = (
+                "Retained in historical Blocks B/C. Guidance includes people in buildings "
+                "to which the fire spread, so this field may encode realised spread. "
+                "No removal sensitivity analysis has been run to quantify its effect."
+            )
         elif in_c and not in_b:
             risk = "proximal prognostic"
-            reason = "Included only in the separately interpreted first-arrival model."
+            reason = (
+                "Included only in the retrospective incident plus arrival-state model; "
+                "Block C also inherits investigative fields from Block B and is not "
+                "a model using only information available at first arrival."
+            )
         elif in_a or in_b:
             risk = "low/moderate"
             reason = "Included in the specified information block; timing limitations apply."

@@ -1,12 +1,14 @@
-import hashlib
 import json
 
 import numpy as np
 import pandas as pd
+import pytest
 from sklearn.metrics import average_precision_score
 
 from fireml.config import ROOT, load_yaml
-from fireml.features import resolve_blocks
+
+
+pytestmark = pytest.mark.artifact
 
 
 def test_metrics_in_legal_ranges():
@@ -193,9 +195,10 @@ def test_random_stability_summary_matches_seed_level_receipt():
     assert int(summary.positive_difference_count) == int(differences.gt(0).sum())
 
 
-def test_grouped_importance_uses_every_block_b_field_and_saved_baseline(cohort):
+def test_grouped_importance_uses_every_block_b_field_and_saved_baseline():
     importance = pd.read_csv(ROOT / "outputs/tables/grouped_permutation_importance.csv")
-    expected_features = resolve_blocks(cohort.columns)["B"]
+    audit = json.loads((ROOT / "outputs/metrics/audit_receipt.json").read_text(encoding="utf-8"))
+    expected_features = audit["feature_blocks"]["B"]
     assert importance["feature"].is_unique
     assert set(importance["feature"]) == set(expected_features)
     temporal = pd.read_csv(ROOT / "outputs/tables/temporal_validation_performance.csv")
@@ -221,15 +224,3 @@ def test_expanding_window_has_valid_prevalence_context():
     )
     assert np.allclose(expanding["normalized_pr_auc"], expected_normalized)
     assert expanding["normalized_pr_auc"].between(0, 1).all()
-
-
-def test_data_archive_manifest_matches_local_recovery_files():
-    path = ROOT / "outputs/metrics/data_archive_manifest.json"
-    archive = json.loads(path.read_text(encoding="utf-8"))
-    assert archive["external_archive_required"] is True
-    assert len(archive["files"]) == 3
-    for item in archive["files"]:
-        local = ROOT / item["path"]
-        assert item["exists"] is True
-        assert item["size_bytes"] == local.stat().st_size
-        assert item["sha256"] == hashlib.sha256(local.read_bytes()).hexdigest()

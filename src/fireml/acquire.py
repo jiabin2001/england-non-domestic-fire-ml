@@ -58,10 +58,13 @@ def acquire_and_cache(force: bool = False) -> tuple[pd.DataFrame, dict]:
     if parquet_path.exists() and not force:
         frame = pd.read_parquet(parquet_path)
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-        metadata.setdefault(
-            "download_timestamp_utc",
-            datetime.fromtimestamp(raw_path.stat().st_mtime, timezone.utc).isoformat(),
-        )
+        # Cached data and its recorded provenance can be used without the ODS.
+        # Do not evaluate raw_path.stat() unless a timestamp actually needs filling,
+        # and do not invent a historical download time when the source is absent.
+        if "download_timestamp_utc" not in metadata and raw_path.exists():
+            metadata["download_timestamp_utc"] = datetime.fromtimestamp(
+                raw_path.stat().st_mtime, timezone.utc
+            ).isoformat()
         if any(column.startswith("UNNAMED:") for column in frame.columns):
             frame, artifact = clean_import_artifacts(frame)
             frame.to_parquet(parquet_path, index=False)

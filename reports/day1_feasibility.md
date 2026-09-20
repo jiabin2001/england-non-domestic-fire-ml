@@ -1,5 +1,7 @@
 # Day 1 feasibility audit
 
+> Historical feasibility audit. The counts, source details and original proceed decision below are retained without re-importing data. Subsequent documentation corrections concerning field timing and annual validation are recorded in [no-rerun revision note](no_rerun_revision.md); the original availability checks do not establish that fields were known at prediction time.
+
 ## Decision
 
 **Feasible — proceed to cohort construction and modelling.**
@@ -44,7 +46,7 @@ For 2024/25, the main study estimand (excluding roofs) gives 23.9% among mappabl
 - Target categories reliably mappable: yes, with roofs explicitly excluded in the main definition.
 - Financial-year design usable: yes.
 - Key Block A/B/C fields usable in 2010/11–2023/24: yes; maximum field missingness is 0.0%.
-- Guidance consistency: no blocking inconsistency found.
+- Guidance consistency: the original audit recorded no blocking inconsistency. Later review identified an interpretation limitation: `OCCUPIED_TIME` may count people in buildings reached by spread, and Block C inherits retrospective investigation fields. These issues require the revised interpretation; their effects on performance have not been tested.
 
 ## Main analysis window
 

@@ -1,10 +1,12 @@
 # Final analysis report
 
+> Documentation correction without a research rerun: the numerical values below are retained from the artifacts in reviewed snapshot `c67f6fcb52834abe2695bfc05ba5bcf6a9e40498`. That snapshot is not established as the training commit. The interpretation of Block C, occupancy information and annual validation is corrected here; no new fit, ablation, statistical estimate or figure has been produced. See [no-rerun revision note](no_rerun_revision.md).
+
 ## Study definition
 
 This retrospective prediction study uses the official **Other Building Fires Dataset** for England. “Non-domestic building fires” is the dissertation's analytical wording for the official *other building fires* category. The category includes commercial, industrial, public and institutional buildings and can include hotels, hostels, care homes and student halls; it is not limited to buildings without accommodation functions.
 
-The analysis predicts incident-level final fire spread among already-recorded primary fires. It is not a causal study, annual building fire-risk model, fire-physics simulation or real-time FRS deployment tool. Block B contains retrospectively recorded incident information; Block C is a separately interpreted first-arrival prognostic model.
+The analysis predicts incident-level final fire spread among already-recorded primary fires. It is not a causal study, annual building fire-risk model, fire-physics simulation or real-time FRS deployment tool. Block B contains retrospectively recorded incident information; Block C combines retrospective incident information with arrival-state information. Because C inherits B's investigation fields, its inputs are not established as available at first arrival.
 
 ## Data and cohort
 
@@ -19,6 +21,8 @@ The main target follows the unambiguous room→floor→whole-building ordering a
 Temporal train/validation/test years are 2010/11–2019/20, 2020/21–2021/22 and 2022/23–2023/24. The stratified random comparator has exactly the same 159,533/23,824/25,814 sample sizes. All imputing and encoding were pipeline-fitted on training data only. Compact hyperparameter and family selection used validation average precision (AP), calculated with scikit-learn's non-interpolated `average_precision_score`; analytical classification thresholds maximised validation F1. The selected train-fitted pipeline and its validation-derived threshold were then evaluated once on the corresponding holdout, with no train+validation refit or test-set retuning.
 
 Random Forest and XGBoost selected identical hyperparameters under random and temporal development designs. Selected settings differed for Logistic Regression: random `{"C": 1.0}` versus temporal `{"C": 0.1}`. The primary XGBoost RQ1 contrast therefore uses the same selected configuration in both designs.
+
+The original model-selection period also supplies the first two expanding-window evaluation years. Their model families and hyperparameters were therefore selected using labels from those years, despite each annual fit using earlier training records. Results for 2020/21–2021/22 are descriptive development-period analyses; only the 2022/23–2023/24 annual rows follow the selection period. This correction does not change the primary train/validation/test boundary.
 
 The main model comparison is Block B, the retrospective incident-information model:
 
@@ -50,7 +54,7 @@ The direction is not universal across information blocks, even for the same XGBo
 
 Block A showed a smaller random advantage (+0.005); Block C reversed in raw AP (-0.008). For Block C, the absolute AP-lift difference after subtracting each holdout's prevalence was effectively zero (-0.0000), while normalized AP slightly favoured the temporal holdout (-0.011). This confines the inferentially supported positive finding to the retrospective Block B specification and shows that split effects depend on the information set. It does not by itself establish that temporal stability of any particular field caused the pattern.
 
-The expanding-window models trained on all years available before each test year achieved a sample-size-weighted mean annual AP of 0.642 in 2022/23–2023/24, compared with 0.640 for the main train-through-2019/20 model on the combined two-year holdout. The +0.001 gap suggests that training recency is not a large explanation here, but it is not a clean decomposition: the annual models use different training sets and a weighted mean of annual AP is not the pooled two-year AP.
+The expanding-window models trained on all years available before each evaluation year achieved a sample-size-weighted mean annual AP of 0.642 in 2022/23–2023/24, compared with 0.640 for the main train-through-2019/20 model on the combined two-year holdout. The +0.001 gap is a descriptive comparison: the annual models use different training sets and a weighted mean of annual AP is not the pooled two-year AP, so it does not isolate the effect of training recency.
 
 AP's no-information baseline is approximately the positive prevalence. The random and temporal XGBoost holdouts had prevalences of 0.257 and 0.265, respectively, so their AP values are interpreted with prevalence context:
 
@@ -81,9 +85,11 @@ With only 30 permutations, the table reports the mean and sample standard deviat
 
 On the same temporal holdout, Block A's 5 structural/context fields achieved AP 0.560, an absolute lift of 0.294 above prevalence. That is 78.5% of Block B's 0.375 lift using 16 fields. This is a descriptive nested-block comparison, not an operational-utility estimate, because some Block A fields are retrospectively recorded.
 
-### RQ3 — First-arrival information
+### RQ3 — Arrival-state information added to retrospective incident records
 
-For validation-selected families, temporal AP rose from 0.640 in Block B to 0.982 in Block C, an absolute gain of 0.342. `FIRE_SIZE_ON_ARRIVAL` is temporally prior to final `SPREAD_OF_FIRE`, but it is a highly proximal state variable. The Block C result is therefore first-arrival prognosis, not pre-incident building risk and not evidence of deployability before crews arrive.
+For validation-selected families, temporal AP rose from 0.640 in Block B to 0.982 in Block C, an absolute gain of 0.342. `FIRE_SIZE_ON_ARRIVAL` is temporally prior to final `SPREAD_OF_FIRE`, but it is a highly proximal state variable. C also retains investigation fields such as `CAUSE_OF_FIRE`, `SOURCE_OF_IGNITION` and `ITEM_IGNITED`, whose recorded values may be revised after arrival. This comparison adds arrival-state information to retrospective incident information; it does not demonstrate prediction from information actually available to crews at first arrival. A feature set restricted to information available at arrival and an arrival-state-only baseline have not been evaluated.
+
+Both B and C retain `OCCUPIED_TIME`. The [official field guidance](https://www.gov.uk/government/statistics/fire-statistics-incident-level-datasets/other-building-fires-dataset-guidance#variable-by-variable---situation) counts people in buildings to which a fire has spread, so this field may encode spread that has already occurred. No removal ablation was run, and neither its performance impact nor the size of any outcome-proxy bias is known. Permutation importance cannot quantify that bias.
 
 ## Temporal stability and sensitivity
 
@@ -94,7 +100,7 @@ For validation-selected families, temporal AP rose from 0.640 in Block B to 0.98
 | 2022/23 | 0.286 | 0.655 | 0.369 | 0.517 | 0.838 |
 | 2023/24 | 0.244 | 0.628 | 0.384 | 0.508 | 0.842 |
 
-Across these 4 later-year folds, AP ranged from 0.628 to 0.687 and had the same rank ordering as prevalence (Spearman 1.000). ROC-AUC varied by only 0.004, AP absolute lift by 0.022, and normalized AP by 0.029. This supports stable later-year ranking performance while showing that much of the raw AP movement accompanies a changing prevalence baseline; four annual folds cannot identify why prevalence changed.
+Across these 4 annual rows, AP ranged from 0.628 to 0.687 and had the same rank ordering as prevalence (Spearman 1.000). ROC-AUC varied by only 0.004, AP absolute lift by 0.022, and normalized AP by 0.029. These are descriptive summaries across two development-period rows (2020/21–2021/22) and two later-year evaluations (2022/23–2023/24), not evidence from four independent test folds. They show how the recorded metrics accompany prevalence changes; they neither establish four-fold independent temporal stability nor identify why prevalence changed.
 
 Expanding-window F1, precision, recall and balanced accuracy use a fixed descriptive threshold of 0.5 and are not directly comparable with the main table's validation-F1 operating point. The 2020/21–2021/22 validation window overlaps the COVID-disrupted period, and 2020/21 has the highest expanding-window prevalence (0.325); this may affect selected settings and thresholds. No policy or COVID attribution is made.
 
@@ -114,15 +120,20 @@ Building-type subgroup AP ranged from 0.051 for Prison (prevalence 0.034) to 0.7
 - The public file has no incident identifier or exact date/month, limiting dependence checks and finer temporal validation.
 - Incident fields may reflect officer judgement; cause/ignition fields may be revised after investigation, and delay fields may be estimated.
 - Block B is retrospective and not strictly dispatch-time information.
-- Block C's exceptional performance is dominated by proximity to the final outcome and must remain a separate prognostic scenario.
+- Block C combines retrospective incident information with arrival-state information. Its proximity to the final outcome and inherited investigation fields prevent interpreting the reported performance as an arrival-time deployment result.
+- `OCCUPIED_TIME` may contain already-observed spread information; it remains in the saved B/C models, and its removal has not been evaluated.
 - Average precision is prevalence-sensitive; cross-split and subgroup comparisons require their respective positive prevalences.
 - Hyperparameters and analytical thresholds were selected using 2020/21–2021/22, a validation window that overlaps the COVID-disrupted period and includes an unusually high-prevalence first year.
+- Expanding-window results for those same selection years are descriptive development-period results. The four annual rows must not be presented as four independent temporal test folds.
 - Bootstrap intervals condition on the fixed splits, fitted models and selected settings; they do not represent repeated end-to-end model-selection uncertainty.
 - `FRS_TERRITORY` is an available pre-incident geographic field excluded by scope rather than outcome leakage; no territory-inclusive sensitivity was run, so its incremental predictive value is unknown.
 - Subgroup and permutation results are descriptive model diagnostics, not evidence of differential or variable-level causal effects.
 - Temporal performance differences do not by themselves identify why distributions changed.
+- Future changes prompted by this review and evaluated on the already-inspected 2022/23–2023/24 holdout must be reported as post-review exploratory analyses. The 2024/25 sensitivity results have also already been inspected; that period is not a new untouched test set.
 - The publisher URL can be replaced in future. Checksums verify retained files but cannot recover them; the ODS and reproducibility Parquet files require a separate durable institutional deposit.
 
 ## Reproducibility
 
-All tables, figures, fitted selected pipelines, split assignments, model-selection settings, software versions and method decisions are saved under `outputs/` and `reports/`. From an existing ODS or Parquet cache, run `python scripts/06_build_report.py` after installing the pinned project environment.
+Saved tables, figures, selected pipelines, split assignments, model-selection settings and historical environment records are under `outputs/` and `reports/`. They were not regenerated for this correction. The unchanged figure captions and `outputs/tables/feature_policy.csv` may retain earlier wording; read them with the corrections above and the [revision note](no_rerun_revision.md).
+
+`python scripts/06_build_report.py` is a full research rerun that needs separately supplied historical source data and the recorded CUDA environment. `python scripts/07_render_report.py` instead reads existing saved outputs and recalculates reporting summaries and figures without model fitting or data acquisition. Neither command was run for this revision. The saved snapshot and software receipt do not establish an immutable link to the original training commit; missing provenance is not reconstructed from the current checkout.
