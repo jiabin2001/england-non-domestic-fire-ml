@@ -1,10 +1,22 @@
 # England Non-Domestic Fire Spread ML
 
-**How much does a random train–test split change estimated fire-spread prediction performance?** This study compares random and temporal evaluation on completed England Fire and Rescue Service incident records, with explicit checks of feature timing, outcome-proxy sensitivity and simple baselines.
+Reproducible code, results and figures for a research project:
 
-The repository contains reproducible Python code, fitted models, per-record test predictions, uncertainty estimates and a generated [analysis report](reports/final_analysis_report.md). All published results were rebuilt in the current run; the [execution record](outputs/metrics/execution.json) documents its stages and code/configuration hashes.
+> **Do random train–test splits overestimate fire-spread prediction? A temporally validated machine-learning study of non-domestic building fires in England**
 
-This is a retrospective prediction study. Its results do not establish real-time deployment readiness, causal effects or a building's annual ignition risk. The official **Other Building Fires** category includes commercial, industrial, public and institutional premises, and some accommodation such as hotels and care homes.
+This project predicts whether a recorded fire spread beyond the room where it started. Its main question is whether randomly mixing incidents from different years gives a more optimistic estimate of predictive performance than training on earlier years and testing on later years.
+
+## Scope and interpretation
+
+The study uses the UK government's **Other Building Fires Dataset** for England. “Non-domestic building fires” refers here to this official category: commercial, industrial, public and institutional premises, as well as some accommodation such as hotels, hostels and care homes.
+
+The binary outcome, `LARGER_FIRE`, distinguishes fires confined to the room of origin or less from fires spreading farther. Roof and roof-space records are excluded from the main definition and examined separately in a sensitivity analysis.
+
+Logistic Regression, Random Forest and XGBoost are compared with a prior-probability baseline. The primary temporal evaluation trains on earlier years and tests on **2022/23–2023/24**; the random comparator uses exactly the same training, validation and test sample sizes. Feature-block comparisons, an occupancy-field removal experiment and single-field baselines examine how performance depends on the information supplied to the models.
+
+This is a retrospective incident-level prediction study using completed Fire and Rescue Service records. Some predictors contain information established during investigation or after fire spread. Its scores therefore describe retrospective prediction; operational use would require verified feature availability and independent prospective evaluation.
+
+The repository includes fitted models, per-record test predictions, uncertainty estimates and a generated [analysis report](reports/final_analysis_report.md). The [execution record](outputs/metrics/execution.json) documents the published run and its code/configuration hashes.
 
 ## Results at a glance
 
@@ -113,3 +125,7 @@ The published run passed **109 synthetic tests, 32 artifact checks and 2 real-da
 | [outputs/models](outputs/models) | Validation-selected fitted pipelines |
 
 Source definitions and quality notes: [government dataset entry page](https://www.gov.uk/government/statistics/fire-statistics-incident-level-datasets) and [Other Building Fires guidance](https://www.gov.uk/government/statistics/fire-statistics-incident-level-datasets/other-building-fires-dataset-guidance).
+
+## License
+
+The project code and documentation are available under the [MIT License](LICENSE). The government source dataset remains subject to its publisher's terms.

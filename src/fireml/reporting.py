@@ -220,7 +220,7 @@ def write_data_archive_manifest() -> dict:
                 "sha256": None,
             })
     manifest = {
-        "purpose": "checksums for a separate durable dissertation data deposit",
+        "purpose": "checksums for a separate durable research data deposit",
         "external_archive_required": True,
         "git_policy": "raw and reproducibility Parquet data are intentionally excluded from Git",
         "files": files,
@@ -890,7 +890,7 @@ def _write_final_report(stability_summary: pd.Series, diagnostics: dict | None =
 
 ## Study definition
 
-This retrospective prediction study uses the official **Other Building Fires Dataset** for England. “Non-domestic building fires” is the dissertation's analytical wording for the official *other building fires* category. The category includes commercial, industrial, public and institutional buildings and can include hotels, hostels, care homes and student halls; it is not limited to buildings without accommodation functions.
+This retrospective prediction study uses the official **Other Building Fires Dataset** for England. “Non-domestic building fires” is the study's analytical wording for the official *other building fires* category. The category includes commercial, industrial, public and institutional buildings and can include hotels, hostels, care homes and student halls; it is not limited to buildings without accommodation functions.
 
 The analysis predicts incident-level final fire spread among already-recorded primary fires. It is not a causal study, annual building fire-risk model, fire-physics simulation or real-time FRS deployment tool. Block B contains retrospectively recorded incident information; Block C combines retrospective incident information plus arrival-state information. Its inherited Block B investigation fields have not been established as available at first arrival.
 
